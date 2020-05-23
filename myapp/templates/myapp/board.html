@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+
+{% load static %}
+
+
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Wargame</title>
+    <script type="text/javascript">
+        <!-- TODO automate this -->
+        const DJANGO_STATIC_URL = '/static/';
+        const PLAYER = {{ player }};
+        var territory_owners = {{ territory_owners }};
+        var visible_attacks = {{ visible_attacks }};
+        var phase = {{ phase }};
+        var turn = {{ turn }};
+        var round = {{ round }};
+        var player_ready = {{ player_ready }};
+        var gameid = {{ gameid }};
+        var pairings = {{ pairings }};
+        var opponent = {{ opponent }};
+    </script>
+    <script src="{% static 'myapp/pixi/pixi.min.js'%}"> </script>
+
+  </head>
+  <body>
+
+    <script src="{% static 'myapp/js/interface.js' %}"> </script>
+
+  </body>
+</html>
