@@ -7,9 +7,8 @@ const chatSocket = new WebSocket(
   'ws://'
    + window.location.host
    + '/ws/board/'
-   + roomName + '/'
    + gameid + '/'
-   + player + '/'
+   + PLAYER + '/'
 );
 
 
@@ -97,8 +96,8 @@ var attack_ycoords =
 var attack_rots = 
 [[2,5],[35,3,5,3.599999999999995],[34,4,7,6,3.4999999999999947],[33,4.099999999999996,36,39,7],[3.8499999999999943,-1.1000000000000016,6,8],[3.900000000000004,5.649999999999991,7,8,9,10,39],[8.700000000000003,0.30000000000000226,5.999999999999993,39],[9,5.600000000000001,4.150000000000003],[4.650000000000012,9.100000000000009,11,12],[11,10.050000000000022,39,40,18,16],[10.150000000000016,12,9.34999999999999,15,16],[10.900000000000027,12.600000000000023,15,13],[16.500000000000064,15,14],[15,15.900000000000041,17],[10.649999999999995,16.30000000000006,14.700000000000024,13.95,16,17],[10.24999999999999,10.75000000000001,18,15.450000000000006,17],[14.550000000000008,15.500000000000007,16.75000000000001,18],[9.899999999999999,15.24999999999999,15.54999999999998,19,20,40],[15.299999999999962,20,25,40],[15.649999999999967,20.250000000000018,32.00000000000006],[22],[17.44999999999995,31,23],[24.250000000000032,31,37,24,26],[25,37,24.100000000000016,26,27,28],[38,37,25.050000000000015,28,15.549999999999951],[23,22.749999999999982,27],[28,23.19999999999999,23.599999999999966,29],[23.099999999999973,24.500000000000007,25.099999999999973,29,30],[30,28.400000000000006,30.60000000000005],[23.649999999999938,31.00000000000003],[32,18.44999999999995,19.749999999999954,38.649999999999906,36],[33,31.65000000000001,36],[32.14999999999999,2.550000000000005,34],[31.900000000000055,1.7500000000000033,35],[32.2000000000001,2],[30.79999999999998,30.799999999999997,37,38,39,3.0500000000000034],[35.30000000000004,24.50000000000002,20.149999999999945,26.800000000000026,38],[36.34999999999998,39,40,25.950000000000014,37.249999999999986],[4,4.000000000000011,3.500000000000009,8.949999999999985,40,38,37.149999999999935],[9.699999999999996,41.64999999999985,20.500000000000036,19.65000000000001,37.65000000000002]]
 
-var attacks = [];
 
+var attacks = {}
 
 PIXI.Loader.shared.add(DJANGO_STATIC_URL + "/myapp/images/map1.png").load(setup);
 
@@ -117,15 +116,13 @@ function setup() {
 
   for (let i = 0; i < land_attacks.length; i++) {
     for (let j = 0; j < land_attacks[i].length; j++) {
-      let a = createAttack(i+1, land_attacks[i][j], i, j)
-      if (a) {
-        attacks.push(a);
-      }
+      createAttack(i+1, land_attacks[i][j], i, j)
     }
   }
   readyButton = makeReadyButton();
   troopCounter = initializeTroopCounter();
-  updateGamestate();
+  console.log(territory_troops);
+  update();
 }
 
 function territoriesOwned() {
@@ -134,7 +131,7 @@ function territoriesOwned() {
 
 
 
-function updateGamestate() {
+function update() {
 
   // set territory owners
   for (let i=0; i < num_territories; i++) {
@@ -142,21 +139,27 @@ function updateGamestate() {
     markers[i].interactive = (territory_owners[i] == PLAYER && phase == 0);
     markers[i].buttonMode = (territory_owners[i] == PLAYER && phase == 0);
   }
+  for (let i=0; i < territory_troops.length; i++) {
+    t = territory_troops[i][0]
+    n = territory_troops[i][1]
+    markers[t-1].updateTroopNum(n)
+  }
+
+  for (var a in attacks) {
+    a.interactive = false;
+    a.buttonMode = false;
+    a.visible = false;
+  }
+
+  console.log(visible_attacks);
+  
   // set visible attacks
-  attacks.forEach(function (attack, index) {
-    console.log(visible_attacks)
-    console.log([attack.t1, attack.t2])
-    if (isArrayInArray(visible_attacks, [attack.t1, attack.t2])) {
-      console.log('inif1')
-      attack.from_t1.interactive = (phase == 1);
-      attack.from_t1.buttonMode = (phase == 1);
-      attack.from_t1.visible = true;
-    } else if (isArrayInArray(visible_attacks, [attack.t2, attack.t1])) {
-      console.log('inif2')
-      attack.from_t2.interactive = (phase == 1);
-      attack.from_t2.buttonMode = (phase == 1);
-      attack.from_t2.visible = true;
-    }
+  visible_attacks.forEach(function ([t1,t2,s], index) {
+    a = attacks[[t1,t2]]
+    a.interactive = (phase == 1);
+    a.buttonMode = (phase == 1);
+    a.visible = true;
+    a.text.text = s;
   })
 
 
@@ -172,20 +175,6 @@ function updateGamestate() {
   }
 }
 
-function t1_valid_attack(attack) {
-  return (territory_owners[attack.t1 - 1] == PLAYER && territory_owners[attack.t2 -1] == opponent)
-}
-function t2_valid_attack(attack) {
-  return (territory_owners[attack.t2 - 1] == PLAYER && territory_owners[attack.t1 -1] == opponent)
-}
-
-//function getTurn() {
-//  return Math.floor(phase / NUM_PHASES) % 3
-//}
-
-//function getRound() {
-//  return Math.floor(phase / (NUM_PHASES * 3))
-//}
 
 function initializeTroopCounter() {
   let group = new PIXI.Container();
@@ -295,6 +284,11 @@ function createMarker(i) {
   group.updateOwner = (territory_owners) => {
     group.circle.tint = playerColors[territory_owners]
   }
+
+  group.updateTroopNum = (n) => {
+    group.text.text = n
+    group.troopNum = n
+  }
   
   return group;
 }
@@ -343,10 +337,6 @@ function createAttack(t1, t2, i, j) {
   text2.scale.x = -1;
   text2.x = 27;
   text2.y = 26;
-
-
-
-
   
   //Fill shape's color
   triangle1.endFill();
@@ -356,6 +346,7 @@ function createAttack(t1, t2, i, j) {
   from_t1group.addChild(triangle1);
   from_t1group.addChild(text1);
   from_t1group.text = text1;
+
 
   let from_t2group = new PIXI.Container();
   from_t2group.addChild(triangle2);
@@ -368,6 +359,9 @@ function createAttack(t1, t2, i, j) {
   from_t2group.visible = false;
   from_t2group.interactive = false;
   from_t2group.buttonMode = false;
+
+  attacks[[t1,t2]] = from_t1group;
+  attacks[[t2,t1]] = from_t2group;
 
   let group = new PIXI.Container();
   group.addChild(from_t1group);
@@ -497,12 +491,60 @@ function keyboard(value) {
 }
 
 
+function updateGamestate(gamestate) {
+  territory_owners = gamestate.territory_owners;
+  territory_troops = gamestate.territory_troops;
+  visible_attacks = gamestate.visible_attacks;
+  phase = gamestate.phase;
+  turn = gamestate.turn;
+  round = gamestate.round;
+  player_ready = gamestate.player_ready;
+  pairings = gamestate.pairings;
+  opponent = gamestate.opponent;
+}
+
+function packageGamestate() {
+  if (phase == 0) {
+    troop_assignments = []
+
+    // set territory owners
+    for (let i=0; i < num_territories; i++) {
+      if (territory_owners[i] == PLAYER) {
+        troop_assignments.push([i+1, markers[i].troopNum])
+      }
+    }
+    return JSON.stringify({troop_assignments : troop_assignments})
+
+  } else if (phase == 1) {
+    attack_strengths = []
+    
+    // set visible attacks
+    visible_attacks.forEach(function ([t1,t2,s], index) {
+      a = attacks[[t1,t2]]
+      attack_strengths.push([t1, t2, parseInt(a.text.text)])
+    })
+
+    return JSON.stringify({attack_strengths: attack_strengths})
+  } else if (phase == 2) {
+    return JSON.stringify({phase3ready: true})
+  }
+}  
+
+    
+
+
+
+
+  
+  
+  
+
 
 
 chatSocket.onmessage = function(e) {
-  const data = JSON.parse(e.data);
-  phase = data.phase;
-  updateGamestate();
+  const gamestate = JSON.parse(e.data);
+  updateGamestate(gamestate);
+  update();
 };
 
 chatSocket.onclose = function(e) {
@@ -510,11 +552,9 @@ chatSocket.onclose = function(e) {
 };
 
 function sendReadyToServer() {
-  chatSocket.send(JSON.stringify({
-    'phase' : phase,
-    'gameid' : gameid,
-    'player' : PLAYER,
-  }))
+  console.log('sending reayd')
+  console.log(packageGamestate())
+  chatSocket.send(packageGamestate())
 }
 
 // taken from https://stackoverflow.com/questions/41661287/how-to-check-if-an-array-contains-another-array
