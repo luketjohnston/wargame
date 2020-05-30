@@ -28,6 +28,8 @@ class GameConsumer(WebsocketConsumer):
     print(text_data)
     message = json.loads(text_data)
     game = Game.objects.get(gameid=self.gameid)
+    print("here, printing message")
+    print(message)
     if 'reset' in message:
       game.processResetMessage(self.player)
       # send player reset message
@@ -71,7 +73,7 @@ class GameConsumer(WebsocketConsumer):
 
   def playerReset(self, event):
     game = Game.objects.get(gameid=self.gameid)
-    if event.player == self.player:
+    if event['player'] == self.player:
       gamestate = game.getGamestateContext(self.player)
       self.send(text_data=json.dumps(gamestate))
     else:

@@ -185,6 +185,11 @@ class Game(models.Model):
     self.player_ready = self.player_ready[:player] + '1' + self.player_ready[player+1:]
     self.save()
 
+  # updates gamestate to indicate player is not ready for next phase
+  def playerNotReady(self, player):
+    self.player_ready = self.player_ready[:player] + '0' + self.player_ready[player+1:]
+    self.save()
+
   def allReady(self):
     return self.player_ready == '1111'
 
@@ -316,7 +321,7 @@ class Game(models.Model):
       t.save()
 
     opponent =  Game.get_pairings()[self.getTurn()][player]
-    opponent_territories = territories.filter(owner=opponent)
+    opponent_territories = self.territories().filter(owner=opponent)
     my_territories = self.ownedTerritories(player)
     my_attacks = self.attacks().filter(origin__in=my_territories, target__in=opponent_territories)
     for a in my_attacks:
@@ -347,6 +352,7 @@ class Game(models.Model):
 
   def processResetMessage(self, player):
     self.resetPrivateToPublic(player)
+    self.playerNotReady(player);
     
     
 

@@ -125,6 +125,7 @@ function setup() {
     }
   }
   readyButton = makeReadyButton();
+  resetButton = makeResetButton();
   createPlayerReadyIndicators();
   updateReadyIndicators();
   troopCounter = initializeTroopCounter();
@@ -320,23 +321,23 @@ function makeResetButton() {
   let group = new PIXI.Container();
 
   // TODO add border?
-  let ready = new PIXI.Graphics();
-  ready.beginFill(0xFFFFFF);
-  ready.drawRect(0,0,200, 40)
-  ready.endFill();
+  let reset = new PIXI.Graphics();
+  reset.beginFill(0xFFFFFF);
+  reset.drawRect(0,0,200, 40)
+  reset.endFill();
 
 
   let text = new PIXI.Text("Reset");
   text.x = 0;
-  text.y = 60;
+  text.y = 0;
   text.width = 200;
   text.height = 35;
   
-  group.addChild(ready);
+  group.addChild(reset);
   group.addChild(text);
   group.text = text;
   group.x = 1800;
-  group.y = 750;
+  group.y = 750 + 60;
 
   // TODO
   // set to true during phase 0 for acting player
@@ -782,7 +783,7 @@ chatSocket.onclose = onclose
 chatSocket.onerror = onclose
 
 function sendResetToServer() {
-  chatSocket.send({'reset' : true})
+  chatSocket.send(JSON.stringify({'reset' : true}))
 }
 
 
