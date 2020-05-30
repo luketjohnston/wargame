@@ -2,8 +2,9 @@ from django.db import models
 from collections import defaultdict
 from django.db.models import Q
 from django.db.models import F
+import random
 
-NUM_PHASES = 3
+NUM_PHASES = 4
 NUM_TURNS = 3
 
 land_attacks = [
@@ -34,28 +35,64 @@ land_attacks = [
   [38,37,24,28,19],            # 25
   [23,24,27],                  # 26
   [28,24,26,29],               # 27
-  [25,24,27,29,30],            # 28
+  [25,24,27,29,30,20],         # 28
   [30,28,27],                  # 29
   [28,29],                     # 30
-  [32,22,23,37,36],            # 31
+  [32,22,23,36],            # 31
   [33,31,36],                  # 32
   [32,4,34],                   # 33
   [33,3,35],                   # 34
   [34,2],                      # 35
   [32,31,37,38,39,4],          # 36
-  [36,23,24,25,38],            # 37
+  [36,23,24,25,38],         # 37
   [36,39,40,25,37],            # 38
   [4,7,6,10,40,38,36],         # 39
   [10,39,18,19,38]             # 40
 ]
+
+RIVERS = [(31,22), (31,23), (25,19), (28,20), (10,18), (10,16), (11,16), (11,15), (12,15), (15,13), (15,14), (14,17), (2,38), (3,34), (4,33), (4,36)]
+
+# territories that have horses
+HORSES = [1,15,22,28]
+
+# territories that have farms
+FARMS = [6,14,26,31]
+
+# territories that have mines
+MINES = [18,33,37,39]
+
+# territories that are mountains
+MOUNTAINS = [36,37,38,39,40]
+
+def createBalancedStart():
+  players = [0,1,2,3]
+  random.shuffle(players);
+  horse_assignments = list(zip(HORSES, players))
+  random.shuffle(players);
+  mine_assignments = list(zip(MINES, players))
+  random.shuffle(players);
+  farm_assignments = list(zip(FARMS, players))
+  other = list(range(1,41));
+  for i in (HORSES + FARMS + MINES):
+    other.remove(i)
+  players = players * 7
+  random.shuffle(players)
+  other_assignments = list(zip(other, players))
+
+  all_assignments = horse_assignments + mine_assignments + farm_assignments + other_assignments
+  all_assignments.sort(key = lambda mytuple: mytuple[0])
+  return [j for (i,j) in all_assignments]
+  
 
 class GameManager(models.Manager):
   def createGame(self, newid):
     print('here1');
     game = self.create(gameid=newid)
     print('here2');
-    for i in range(1,41):
-      Territory(num=i, owner=(i-1)/10, game=game).save()
+
+    owners = createBalancedStart()
+    for i in range(0,40):
+      Territory(num=i+1, owner=owners[i], game=game).save()
     for i in range(len(land_attacks)):
       for j in land_attacks[i]:
         attack = Attack(
@@ -104,14 +141,40 @@ class Game(models.Model):
 
   def allReadyUpdate(self):
     assert self.player_ready == '1111'
-    if (self.phase % NUM_PHASES == 0):
+    if (self.getPhase() == 0):
       self.pushPrivateToPublic()
-    elif (self.phase % NUM_PHASES == 1):
+    elif (self.getPhase() == 1):
       self.pushPrivateToPublic()
-    elif (self.phase % NUM_PHASES == 2):
+    elif (self.getPhase() == 2):
       self.pushPrivateToPublic()
-    elif (self.phase % NUM_PHASES == 3):
+    elif (self.getPhase() == 3):
       self.pushPrivateToPublic()
+      # first, adjust all attacks to net strength. If A attack B at 3 and B attack A at 2, 
+      # adjustment will be: A attack B at 1, B attack A at 0
+   
+      for a in self.attacks():
+        matching_attack = a.getComplementaryAttack()
+        a.public_strength = max(a.private_strength - matching_attack.private_strength - a.isOverRiver(), 0)
+        a.save()
+
+      
+      territories = self.territories();
+      for t in self.territories():
+        defending_strength = t.public_troops * 2 + (t.num in MOUNTAINS); 
+        attacks = self.attacks().filter(target=t)
+        for a in attacks:
+          defending_strength -= a.public_strength
+        if defending_strength < 0:
+          t.owner = self.get_pairings()[self.getTurn()][t.owner]
+
+        t.public_troops = 0;
+        t.private_troops = 0;
+        t.save();
+      
+      for a in self.attacks():
+        a.public_strength = 0;
+        a.private_strength = 0;
+        a.save();
 
     self.phase = self.phase + 1
     self.player_ready = '0000';
@@ -131,8 +194,36 @@ class Game(models.Model):
   def unownedTerritories(self, player):
     return self.territories().filter(~Q(owner=player))
 
-  def availableTroops(self, player):
-    return len(self.ownedTerritories(player))
+  def getAvailableTroops(self, player):
+    if self.getPhase() != 0:
+      return 0;
+    territories = self.ownedTerritories(player).values_list('num', flat=True);
+    count = len(territories)
+    for t in territories:
+      if t in FARMS:
+        count += 1
+    # can always field at least 10 troops
+    return max(count, 10)
+
+
+  def getAvailableHorses(self, player):
+    territories = self.ownedTerritories(player).values_list('num', flat=True);
+    count = 0
+    for t in territories:
+      if t in HORSES:
+        count += 1
+    return count
+
+  def getAvailableMines(self, player):
+    territories = self.ownedTerritories(player).values_list('num', flat=True);
+    count = 0
+    for t in territories:
+      if t in MINES:
+        count += 1
+    return count
+    
+        
+    
 
   def territories(self):
     return Territory.objects.filter(game=self)
@@ -140,8 +231,13 @@ class Game(models.Model):
   def attacks(self):
     return Attack.objects.filter(game=self)
     
+  def playerIsReady(self, player):
+    return self.player_ready[player] == '1'
+
 
   def phase0Ready(self, player, troop_assignments):
+    if self.playerIsReady(player):
+      return;
     total_troop_assigned = 0;
     owned_territories = self.ownedTerritories(player).values_list('num', flat=True)
 
@@ -162,6 +258,8 @@ class Game(models.Model):
     self.save()
 
   def phase1Ready(self, player, attack_strengths):
+    if self.playerIsReady(player):
+      return;
     for (t1, t2, s) in attack_strengths:
       attacking_territory = self.territories().get(num=t1)
       attack = self.attacks().get(origin__num=t1, target__num=t2)
@@ -173,17 +271,46 @@ class Game(models.Model):
       else:
         print('invalid phase1ready data from player %d' % player)
         print(attack_strengths)
-        self.resetPublicToPrivate(player)
+        self.resetPrivateToPublic(player)
 
 
     # TODO this is what I need to work on
     self.playerReady(player)
     self.save()
 
+  def phase2Ready(self, player, mine_assignments, horse_assignments):
+    if self.playerIsReady(player):
+      return;
+
+    total_mines = 0
+    total_horses = 0
+    for (t1, m) in mine_assignments:
+      territory = self.territories().get(num=t1)
+      territory.private_troops += m
+      territory.save()
+      total_mines += m
+    for (t1, t2, h) in horse_assignments:
+      attack = self.attacks().get(origin__num=t1, target__num=t2)
+      attack.private_strength += h
+      attack.save()
+      total_horses += h
+    if total_horses > self.getAvailableHorses(player) or total_mines > self.getAvailableMines(player):
+      print('invalid phase1ready data from player %d' % player) 
+      self.resetPrivateToPublic(player)
+
+
+    self.playerReady(player)
+    self.save()
+  def phase3Ready(self, player):
+    if self.playerIsReady(player):
+      return;
+    self.playerReady(player)
+    self.save()
+
   # resets a player's private data to the public data. Used when a player needs to undo their move
   # or if the server is processing a move and then determines it is invalid and has to discard 
   # the changes
-  def resetPublicToPrivate(self, player):
+  def resetPrivateToPublic(self, player):
     for t in self.ownedTerritories(player):
       t.private_troops = t.public_troops;
       t.save()
@@ -209,15 +336,27 @@ class Game(models.Model):
       
   def processReadyMessage(self, player, message):
     print('in process ready message')
-    if self.phase==0:
+    if self.phase % NUM_PHASES == 0:
       self.phase0Ready(player,message['troop_assignments'])
-    if self.phase==1:
+    if self.phase % NUM_PHASES == 1:
       self.phase1Ready(player,message['attack_strengths'])
-    if self.phase==2:
-      self.phase2Ready(player,message['attack_strengths'])
+    if self.phase % NUM_PHASES == 2:
+      self.phase2Ready(player, message['mine_assignments'], message['horse_assignments'])
+    if self.phase % NUM_PHASES == 3:
+      self.phase3Ready(player)
+
+  def processResetMessage(self, player):
+    self.resetPrivateToPublic(player)
     
     
-        
+
+  def getOpponent(self, player):
+    return Game.get_pairings()[self.getTurn()][player]
+
+  def getPhase(self):
+    return self.phase % NUM_PHASES
+
+    
     
     
 
@@ -225,8 +364,11 @@ class Game(models.Model):
 
     territories = Territory.objects.filter(game=self).order_by('num')
     territory_owners = territories.values_list('owner', flat=True)
-    opponent =  Game.get_pairings()[self.getTurn()][player]
+    opponent =  self.getOpponent(player);
+    print('getting gamestate context for player %d' % player)
+    print('opponent: %d' % opponent)
     opponent_territories = territories.filter(owner=opponent)
+    print(opponent_territories)
     my_territories = self.ownedTerritories(player)
 
     
@@ -240,23 +382,25 @@ class Game(models.Model):
 
 
 
-    if self.phase == 0: 
+    if self.getPhase() == 0: 
       pass
-    if self.phase == 1 or self.phase == 2:
+    if self.getPhase() == 1 or self.getPhase() == 2 or self.getPhase() == 3:
       # add my attacks to visible_attacks
       my_attacks = attacks.filter(origin__in=my_territories, target__in=opponent_territories)
+      if self.getPhase() == 3:
+        # don't show strength 0 attacks for current player
+        my_attacks = my_attacks.filter(~Q(public_strength=0)) 
       my_attacks = my_attacks.values_list('origin__num', 'target__num')
       my_attack_strengths = list(my_attacks.values_list('private_strength', flat=True))
       a1 = [[i,j,s] for ((i,j), s) in zip(my_attacks, my_attack_strengths)]
       visible_attacks += a1
 
-    if self.phase == 2 or self.phase == 3:
+    if self.getPhase() == 2 or self.getPhase() == 3:
       # add all attacks to visible_attacks
       other_attacks = attacks.filter(~Q(origin__in=my_territories, target__in=opponent_territories))
-      if self.phase == 2:
-        # don't show 0 strength attacks that aren't possible attacks for current player.
-        # this will include all attacks that are impossible (intra player attacks, etc.)
-        other_attacks = other_attacks.filter(~Q(public_strength=0)) 
+      # don't show 0 strength attacks that aren't possible attacks for current player.
+      # this will include all attacks that are impossible (intra player attacks, etc.)
+      other_attacks = other_attacks.filter(~Q(public_strength=0)) 
       other_attacks = other_attacks.values_list('origin__num', 'target__num')
       other_attack_strengths = list(other_attacks.values_list('public_strength', flat=True))
       a2 = [[i,j,s] for ((i,j), s) in zip(other_attacks, other_attack_strengths)]
@@ -267,13 +411,18 @@ class Game(models.Model):
       'territory_owners' : list(territory_owners),
       'visible_attacks' : list(visible_attacks),
       'territory_troops' : territory_troops,
-      'phase': self.phase,
+      'phase': self.getPhase(),
       'turn': self.getTurn(),
       'round': self.getRound(),
-      'player_ready': self.player_ready,
+      'player_ready': [int(self.player_ready[i] == '1') for i in range(4)],
       'gameid': self.gameid,
       'pairings': Game.get_pairings(),
       'opponent': Game.get_pairings()[self.getTurn()][player],
+      'available_troops' : self.getAvailableTroops(player),
+      'available_horses' : self.getAvailableHorses(player),
+      'available_mines' : self.getAvailableMines(player),
+      'opponent_horses' : self.getAvailableHorses(opponent),
+      'opponent_mines' : self.getAvailableMines(opponent),
     }
     return context
 
@@ -300,12 +449,30 @@ class Territory(models.Model):
   #attacking = models.IntegerField(default=0)
   #defending = models.IntegerField(default=0)
 
+  def hasFarm(self):
+    return self.num in FARMS
+  def hasMine(self):
+    return self.num in MINES
+  def hasHorse(self):
+    return self.num in HORSES
+  def hasMountain(self):
+    return self.num in MOUNTAINS
+
 class Attack(models.Model):
   game = models.ForeignKey(Game, on_delete=models.CASCADE)
   origin = models.ForeignKey(Territory, on_delete=models.CASCADE, related_name='origin')
   target = models.ForeignKey(Territory, on_delete=models.CASCADE)
   public_strength = models.IntegerField(default=0)
   private_strength = models.IntegerField(default=0)
+
+  def getComplementaryAttack(self):
+    print('origin and target')
+    print(self.origin.num)
+    print(self.target.num)
+    return Attack.objects.get(origin__num=self.target.num, target__num=self.origin.num, game=self.game)
+
+  def isOverRiver(self):
+    return (((self.origin.num, self.target.num) in RIVERS) or ((self.target.num, self.origin.num) in RIVERS))
   
 
 

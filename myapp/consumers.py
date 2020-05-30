@@ -27,15 +27,19 @@ class GameConsumer(WebsocketConsumer):
     print('receiving data')
     print(text_data)
     message = json.loads(text_data)
-
-    # need to record that the player is ready in the database
-    # then, if all players are ready, need to
-    # 1. update game state
-    # 2. send it to all players
-
-
-    # record player ready in database
     game = Game.objects.get(gameid=self.gameid)
+    if 'reset' in message:
+      game.processResetMessage(self.player)
+      # send player reset message
+      async_to_sync(self.channel_layer.group_send)(
+        self.room_group_name,
+        {
+          'type': 'playerReset',
+          'player': self.player,
+        }
+      )
+      return
+
     game.processReadyMessage(self.player, message)
     print(game.player_ready)
 
@@ -48,6 +52,15 @@ class GameConsumer(WebsocketConsumer):
           'type': 'nextPhase',
         }
       )
+    else:
+      # send player ready message
+      async_to_sync(self.channel_layer.group_send)(
+        self.room_group_name,
+        {
+          'type': 'playerReady',
+          'player': self.player,
+        }
+      )
 
 
   def nextPhase(self, event):
@@ -55,3 +68,17 @@ class GameConsumer(WebsocketConsumer):
     game = Game.objects.get(gameid=self.gameid)
     gamestate = game.getGamestateContext(self.player)
     self.send(text_data=json.dumps(gamestate))
+
+  def playerReset(self, event):
+    game = Game.objects.get(gameid=self.gameid)
+    if event.player == self.player:
+      gamestate = game.getGamestateContext(self.player)
+      self.send(text_data=json.dumps(gamestate))
+    else:
+      # for other players, just need to indicate this player isn't ready
+      self.send(json.dumps({'playerReadyMessage' : [int(game.player_ready[i] == '1') for i in range(4)]}))
+
+  def playerReady(self, event):
+    game = Game.objects.get(gameid=self.gameid)
+    self.send(json.dumps({'playerReadyMessage' : [int(game.player_ready[i] == '1') for i in range(4)]}))
+    

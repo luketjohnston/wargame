@@ -18,9 +18,19 @@
         var turn = {{ turn }};
         var round = {{ round }};
         var player_ready = {{ player_ready }};
+        console.log("HERE AT THE BEGINNING");
+        console.log(player_ready);
         var gameid = {{ gameid }};
         var pairings = {{ pairings }};
         var opponent = {{ opponent }};
+        var available_troops = {{ available_troops }};
+        var available_horses = {{ available_horses }};
+        var available_mines = {{ available_mines }};
+        var opponent_horses = {{ opponent_horses }};
+        var opponent_mines = {{ opponent_mines }};
+        var turn1imageURL = "{% static 'myapp/images/turn1colors.png'%}";
+        var turn2imageURL = "{% static 'myapp/images/turn2colors.png'%}";
+        var turn3imageURL = "{% static 'myapp/images/turn3colors.png'%}";
     </script>
     <script src="{% static 'myapp/pixi/pixi.min.js'%}"> </script>
 
