@@ -1,1 +1,1 @@
-web: daphne wargame.asgi:application
+web: daphne wargame.asgi:application --port $PORT
