@@ -12,7 +12,6 @@ import os
 import django
 #from django.core.asgi import get_asgi_application
 from channels.routing import get_default_application
-import channels.asgi
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'wargame.settings')
 django.setup()
