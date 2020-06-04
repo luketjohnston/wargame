@@ -1,8 +1,10 @@
 const num_territories = 40;
 
+const protocol =  window.location.protocol === 'https:' ? 'wss' : 'ws' 
+
 var chatSocket = new WebSocket(
   // TODO roomname
-  'ws://'
+   protocol + '://'
    + window.location.host
    + '/ws/board/'
    + gamename + '/'
@@ -759,7 +761,7 @@ function onclose(e) {
   setTimeout(function() {
     chatSocket = new WebSocket(
       // TODO roomname
-      'ws://'
+       protocol + '://'
        + window.location.host
        + '/ws/board/'
        + gamename + '/'
