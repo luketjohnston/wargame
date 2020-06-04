@@ -1,1 +1,1 @@
-web: gunicorn wargame.wsgi --log-file -
+web: daphne wargame.asgi:application --log-file -
