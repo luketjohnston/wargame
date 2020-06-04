@@ -9,7 +9,6 @@
     <title>Wargame</title>
     <script type="text/javascript">
         <!-- TODO automate this -->
-        const DJANGO_STATIC_URL = '/static/';
         const PLAYER = {{ player }};
         console.log('player:')
         console.log(PLAYER)
@@ -33,6 +32,7 @@
         var turn1imageURL = "{% static 'myapp/images/turn1colors.png'%}";
         var turn2imageURL = "{% static 'myapp/images/turn2colors.png'%}";
         var turn3imageURL = "{% static 'myapp/images/turn3colors.png'%}";
+        var mapURL =        "{% static 'myapp/images/map1.png'%}";
     </script>
     <script src="{% static 'myapp/pixi/pixi.min.js'%}"> </script>
 

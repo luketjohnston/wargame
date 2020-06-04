@@ -101,7 +101,7 @@ var attack_rots =
 var attacks = {}
 
 PIXI.Loader.shared
-  .add(DJANGO_STATIC_URL + "/myapp/images/map1.png")
+  .add(mapURL)
   .add(turn1imageURL)
   .add(turn2imageURL)
   .add(turn3imageURL)
@@ -109,7 +109,7 @@ PIXI.Loader.shared
 
 function setup() {
   // this code will run whent he loader has finished loading the image
-  let map = new PIXI.Sprite(PIXI.Loader.shared.resources[DJANGO_STATIC_URL + "/myapp/images/map1.png"].texture);
+  let map = new PIXI.Sprite(PIXI.Loader.shared.resources[mapURL].texture);
   app.stage.addChild(map);
 
   app.renderer.autoDensity = true;
