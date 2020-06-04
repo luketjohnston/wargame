@@ -11,6 +11,8 @@
         <!-- TODO automate this -->
         const DJANGO_STATIC_URL = '/static/';
         const PLAYER = {{ player }};
+        console.log('player:')
+        console.log(PLAYER)
         var territory_owners = {{ territory_owners }};
         var territory_troops = {{ territory_troops }};
         var visible_attacks = {{ visible_attacks }};
@@ -18,9 +20,9 @@
         var turn = {{ turn }};
         var round = {{ round }};
         var player_ready = {{ player_ready }};
-        console.log("HERE AT THE BEGINNING");
-        console.log(player_ready);
-        var gameid = {{ gameid }};
+        var gamename = '{{ gamename }}';
+        console.log('here');
+        console.log(gamename);
         var pairings = {{ pairings }};
         var opponent = {{ opponent }};
         var available_troops = {{ available_troops }};

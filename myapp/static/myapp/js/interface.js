@@ -5,8 +5,7 @@ var chatSocket = new WebSocket(
   'ws://'
    + window.location.host
    + '/ws/board/'
-   + gameid + '/'
-   + PLAYER + '/'
+   + gamename + '/'
 );
 
 
@@ -17,7 +16,6 @@ if(!PIXI.utils.isWebGLSupported()){
 
 PIXI.utils.sayHello(type)
 
-//console.log(visible_attacks);
 
 
 let app = new PIXI.Application({width: 256, height: 256});
@@ -30,6 +28,7 @@ var combatIndicators = [];
 var readyIndicators = [];
 
 const playerColors = [0x2B7255, 0x094788, 0x8C0101, 0x9EA006]
+
 
 document.body.appendChild(app.view);
 
@@ -129,7 +128,6 @@ function setup() {
   createPlayerReadyIndicators();
   updateReadyIndicators();
   troopCounter = initializeTroopCounter();
-  //console.log(territory_troops);
   setupCombatIndicator();
   update();
 }
@@ -152,9 +150,7 @@ function setupCombatIndicator() {
 }
 
 function updateTurnSprites() {
-  console.log('in updateTurnSprites');
   for (let i = 0; i < combatIndicators.length; i++) {
-    console.log(turn == i);
     combatIndicators[i].visible = (turn == i);
   }
 }
@@ -179,9 +175,6 @@ function update() {
   // set territory owners
   for (let i=0; i < num_territories; i++) {
     markers[i].updateOwner(territory_owners[i]);
-    console.log('available_mines')
-    console.log(available_mines)
-    console.log(phase)
     markers[i].interactive = (territory_owners[i] == PLAYER && (phase == 0 || (phase == 2 && available_mines > 0)));
     markers[i].buttonMode = (territory_owners[i] == PLAYER && (phase == 0 || (phase == 2 && available_mines > 0)));
     markers[i].updateTroopNum(0) // zero everything before updating
@@ -384,9 +377,9 @@ function createPlayerReadyIndicators() {
 
 function updateReadyIndicators() {
   for (let i = 0; i < 4; i++) {
-    console.log('updateReadyIndicators')
-    console.log(player_ready)
-    console.log(player_ready[i])
+    //console.log('updateReadyIndicators')
+    //console.log(player_ready)
+    //console.log(player_ready[i])
     if (player_ready[i] === 0) {
       readyIndicators[i].text = '...';
     } else {
@@ -686,8 +679,8 @@ function updateGamestate(gamestate) {
   turn = gamestate.turn;
   round = gamestate.round;
   player_ready = gamestate.player_ready;
-  console.log('here updating gamestate player_ready')
-  console.log(player_ready)
+  //console.log('here updating gamestate player_ready')
+  //console.log(player_ready)
   pairings = gamestate.pairings;
   opponent = gamestate.opponent;
   available_troops = gamestate.available_troops;
@@ -749,9 +742,9 @@ function packageGamestate() {
 function onmessage(e) {
   let message = JSON.parse(e.data);
   if ('playerReadyMessage' in message) {
-    console.log('received playerReadyMessage')
+    //console.log('received playerReadyMessage')
     player_ready = message['playerReadyMessage']
-    console.log(player_ready)
+    //console.log(player_ready)
     updateReadyIndicators();
   } else {
     updateGamestate(message);
@@ -769,8 +762,7 @@ function onclose(e) {
       'ws://'
        + window.location.host
        + '/ws/board/'
-       + gameid + '/'
-       + PLAYER + '/'
+       + gamename + '/'
     );
     chatSocket.onmessage = onmessage;
     chatSocket.onclose = onclose;

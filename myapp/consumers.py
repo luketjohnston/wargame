@@ -5,9 +5,11 @@ from asgiref.sync import async_to_sync
 
 class GameConsumer(WebsocketConsumer):
   def connect(self):
-    self.gameid = int(self.scope['url_route']['kwargs']['gameid'])
-    self.player = int(self.scope['url_route']['kwargs']['player'])
-    self.room_group_name = str(self.gameid)
+    self.gamename = self.scope['url_route']['kwargs']['gamename']
+    self.session_key = self.scope['session'].session_key
+    game = Game.objects.get(name=self.gamename)
+    self.player = game.getPlayerByKey(self.session_key)
+    self.room_group_name = self.gamename
     
     async_to_sync(self.channel_layer.group_add)(
       self.room_group_name,
@@ -24,12 +26,8 @@ class GameConsumer(WebsocketConsumer):
 
   # receive message from websocket
   def receive(self, text_data):
-    print('receiving data')
-    print(text_data)
     message = json.loads(text_data)
-    game = Game.objects.get(gameid=self.gameid)
-    print("here, printing message")
-    print(message)
+    game = Game.objects.get(name=self.gamename)
     if 'reset' in message:
       game.processResetMessage(self.player)
       # send player reset message
@@ -66,13 +64,12 @@ class GameConsumer(WebsocketConsumer):
 
 
   def nextPhase(self, event):
-    print('in next phase');
-    game = Game.objects.get(gameid=self.gameid)
+    game = Game.objects.get(name=self.gamename)
     gamestate = game.getGamestateContext(self.player)
     self.send(text_data=json.dumps(gamestate))
 
   def playerReset(self, event):
-    game = Game.objects.get(gameid=self.gameid)
+    game = Game.objects.get(name=self.gamename)
     if event['player'] == self.player:
       gamestate = game.getGamestateContext(self.player)
       self.send(text_data=json.dumps(gamestate))
@@ -81,6 +78,6 @@ class GameConsumer(WebsocketConsumer):
       self.send(json.dumps({'playerReadyMessage' : [int(game.player_ready[i] == '1') for i in range(4)]}))
 
   def playerReady(self, event):
-    game = Game.objects.get(gameid=self.gameid)
+    game = Game.objects.get(name=self.gamename)
     self.send(json.dumps({'playerReadyMessage' : [int(game.player_ready[i] == '1') for i in range(4)]}))
     

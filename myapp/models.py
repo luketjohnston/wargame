@@ -85,10 +85,8 @@ def createBalancedStart():
   
 
 class GameManager(models.Manager):
-  def createGame(self, newid):
-    print('here1');
-    game = self.create(gameid=newid)
-    print('here2');
+  def createGame(self, gamename):
+    game = self.create(name=gamename)
 
     owners = createBalancedStart()
     for i in range(0,40):
@@ -116,20 +114,32 @@ class Game(models.Model):
   phase = models.IntegerField(default=0)
   player_ready = models.CharField(max_length=4, default='0000')
   objects = GameManager();
-  gameid = models.IntegerField(primary_key=True);
+  player1 = models.CharField(max_length=30, null=True)
+  player2 = models.CharField(max_length=30, null=True)
+  player3 = models.CharField(max_length=30, null=True)
+  player4 = models.CharField(max_length=30, null=True)
+
+  player1key = models.CharField(max_length=50, null=True)
+  player2key = models.CharField(max_length=50, null=True)
+  player3key = models.CharField(max_length=50, null=True)
+  player4key = models.CharField(max_length=50, null=True)
+
+  name = models.CharField(max_length=50)
 
 
   @classmethod
-  def create(cls, gameid):
-    game = cls(gameid=gameid)
+  def create(cls, gamename):
+    if Game.objects.get(name=gamename):
+      raise Exception("game %s already exists" % gamename)
+    game = cls(gamename)
     game.save()
     return game
 
   @classmethod
   def get_pairings(cls):
-    turn0 = {0: 1, 1: 0, 2: 3, 3: 2}
-    turn1 = {0: 2, 2: 0, 1: 3, 3: 1}
-    turn2 = {0: 3, 3: 0, 1: 2, 2: 1}
+    turn0 = {5: 5, 0: 1, 1: 0, 2: 3, 3: 2}
+    turn1 = {5: 5, 0: 2, 2: 0, 1: 3, 3: 1}
+    turn2 = {5: 5, 0: 3, 3: 0, 1: 2, 2: 1}
     return [turn0, turn1, turn2]
 
   def getTurn(self):
@@ -179,6 +189,28 @@ class Game(models.Model):
     self.phase = self.phase + 1
     self.player_ready = '0000';
     self.save()
+
+
+  # given a player key, returns corresponding player 
+  # returns 5 if no match
+  def getPlayerByKey(self, key):
+    print(' in get player by key')
+    print(key)
+    print(self.player1key)
+    print(self.player2key)
+    print(self.player3key)
+    print(self.player4key)
+    if not key:
+      return 5
+    if self.player1key == key:
+      return 0
+    if self.player2key == key:
+      return 1
+    if self.player3key == key:
+      return 2
+    if self.player4key == key:
+      return 3
+    return 5
 
   # updates gamestate to indicate player is ready for next phase
   def playerReady(self, player):
@@ -421,7 +453,7 @@ class Game(models.Model):
       'turn': self.getTurn(),
       'round': self.getRound(),
       'player_ready': [int(self.player_ready[i] == '1') for i in range(4)],
-      'gameid': self.gameid,
+      'gamename': self.name,
       'pairings': Game.get_pairings(),
       'opponent': Game.get_pairings()[self.getTurn()][player],
       'available_troops' : self.getAvailableTroops(player),
