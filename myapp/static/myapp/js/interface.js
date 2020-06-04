@@ -755,26 +755,26 @@ function onmessage(e) {
 };
 
 function onclose(e) {
-  console.error('Chat socket closed unexpectedly, or did not open. Reconnecting in 10 sec...');
-  
-  // try to reconnect in half a second. If fails, will re-call this function
-  setTimeout(function() {
-    chatSocket = new WebSocket(
-      // TODO roomname
-       protocol + '://'
-       + window.location.host
-       + '/ws/board/'
-       + gamename + '/'
-    );
-    chatSocket.onmessage = onmessage;
-    chatSocket.onclose = onclose;
-    }, 10000);
+  //console.error('Chat socket closed unexpectedly, or did not open. Reconnecting in 10 sec...');
+  console.error('Chat socket closed unexpectedly, or did not open.');
+  //// try to reconnect in half a second. If fails, will re-call this function
+  //setTimeout(function() {
+  //  chatSocket = new WebSocket(
+  //    // TODO roomname
+  //     protocol + '://'
+  //     + window.location.host
+  //     + '/ws/board/'
+  //     + gamename + '/'
+  //  );
+  //  chatSocket.onmessage = onmessage;
+  //  chatSocket.onclose = onclose;
+  //  }, 10000);
 };
 
 
 chatSocket.onmessage = onmessage
 chatSocket.onclose = onclose
-chatSocket.onerror = onclose
+//chatSocket.onerror = onclose
 
 function sendResetToServer() {
   chatSocket.send(JSON.stringify({'reset' : true}))
