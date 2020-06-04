@@ -1,1 +1,1 @@
-web: daphne wargame.asgi:application --log-file -
+web: daphne wargame.asgi:application
