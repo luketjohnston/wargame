@@ -206,8 +206,8 @@ function update() {
   // set visible attacks
   visible_attacks.forEach(function ([t1,t2,s], index) {
     a = attacks[[t1,t2]]
-    a.interactive = (phase == 1 || (phase == 2 && available_horses > 0 && territory_owners[t1 - 1] == PLAYER));
-    a.buttonMode =  (phase == 1 || (phase == 2 && available_horses > 0 && territory_owners[t1 - 1] == PLAYER));
+    a.interactive = (phase == 0 || (phase == 1 && available_horses > 0 && territory_owners[t1 - 1] == PLAYER));
+    a.buttonMode =  (phase == 0 || (phase == 1 && available_horses > 0 && territory_owners[t1 - 1] == PLAYER));
     a.visible = true;
     a.text.text = s;
     a.assignedTroops = s;
@@ -572,7 +572,7 @@ function markerClick(event) {
     if (phase == 0 && this.troopNum > 0) {
       this.troopNum -= 1;
       available_troops +=1;
-    } else if (phase == 2 && this.assignedMines > 0) {
+    } else if (phase == 1 && this.assignedMines > 0) {
       this.assignedMines -= 1;
       available_mines += 1;
     }
@@ -581,7 +581,7 @@ function markerClick(event) {
     if (phase == 0 && available_troops > 0) {
       this.troopNum += 1;
       available_troops -= 1;
-    } else if (phase == 2 && available_mines > 0) {
+    } else if (phase == 1 && available_mines > 0) {
       this.assignedMines += 1;
       available_mines -= 1;
     }
@@ -597,24 +597,26 @@ function markerClick(event) {
 
 function adjustAttack(event) {
   if (shiftKey.isDown) {
-    if(phase == 1 && this.assignedTroops > 0) {
+    if(phase == 0 && this.assignedTroops > 0) {
       this.assignedTroops -= 1;
-      markers[this.territory-1].troopNum +=1;
+      available_troops +=1;
       this.updateText();
       markers[this.territory-1].updateText();
-    } else if (phase == 2 && this.assignedHorses > 0) {
+      troopCounter.updateText();
+    } else if (phase == 1 && this.assignedHorses > 0) {
       this.assignedHorses -= 1;
       available_horses += 1;
       this.updateText();
       troopCounter.updateText();
     }
   } else {
-    if (phase == 1 && markers[this.territory - 1].troopNum > 0) {
+    if (phase == 0 && available_troops > 0) {
       this.assignedTroops += 1;
-      markers[this.territory-1].troopNum -=1;
+      available_troops -=1;
       this.updateText();
       markers[this.territory-1].updateText();
-    } else if (phase == 2 && available_horses > 0) {
+      troopCounter.updateText();
+    } else if (phase == 1 && available_horses > 0) {
       this.assignedHorses += 1;
       available_horses -=1;
       this.updateText();
@@ -702,9 +704,7 @@ function packageGamestate() {
         troop_assignments.push([i+1, markers[i].troopNum])
       }
     }
-    return JSON.stringify({troop_assignments : troop_assignments})
 
-  } else if (phase == 1) {
     attack_strengths = []
     
     // set visible attacks
@@ -713,8 +713,9 @@ function packageGamestate() {
       attack_strengths.push([t1, t2, parseInt(a.text.text)])
     })
 
-    return JSON.stringify({attack_strengths: attack_strengths})
-  } else if (phase == 2) {
+    return JSON.stringify({defense_assignments : troop_assignments, attack_assignments: attack_strengths})
+
+  } else if (phase == 1) {
       horse_assignments = []
       mine_assignments = []
       // set territory owners
@@ -730,7 +731,7 @@ function packageGamestate() {
         }
       })
       return JSON.stringify({horse_assignments : horse_assignments, mine_assignments : mine_assignments})
-  } else if (phase == 3) {
+  } else if (phase == 2) {
     return JSON.stringify({phase3ready: true})
   }
 }  

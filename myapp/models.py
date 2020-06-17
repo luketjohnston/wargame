@@ -4,7 +4,7 @@ from django.db.models import Q
 from django.db.models import F
 import random
 
-NUM_PHASES = 4
+NUM_PHASES = 3
 NUM_TURNS = 3
 
 land_attacks = [
@@ -157,8 +157,6 @@ class Game(models.Model):
       self.pushPrivateToPublic()
     elif (self.getPhase() == 2):
       self.pushPrivateToPublic()
-    elif (self.getPhase() == 3):
-      self.pushPrivateToPublic()
       # first, adjust all attacks to net strength. If A attack B at 3 and B attack A at 2, 
       # adjustment will be: A attack B at 1, B attack A at 0
    
@@ -272,50 +270,43 @@ class Game(models.Model):
     return self.player_ready[player] == '1'
 
 
-  def phase0Ready(self, player, troop_assignments):
+  def phase0Ready(self, player, defense_assignments, attack_assignments):
     if self.playerIsReady(player):
       return;
     total_troop_assigned = 0;
     owned_territories = self.ownedTerritories(player).values_list('num', flat=True)
+    opponent_territories = self.territories().filter(owner=self.getOpponent(player)).values_list('num', flat=True)
 
     # check if valid troop assignment
-    for (i, n) in troop_assignments:
+    for (i, n) in defense_assignments:
       total_troop_assigned += n;
       if not i in owned_territories:
         print('Got invalid troop assignment (%d,%d) for player %d:' % (i,n,player))
         return
-    if n > len(owned_territories):
+    for (t1,t2, i) in attack_assignments:
+      total_troop_assigned += n;
+      if not (t1 in owned_territories and t2 in opponent_territories):
+        print('Got invalid attack assignment (%d,%d,%d) for player %d:' % (i,t1,t2,player))
+        return
+
+    if n > self.getAvailableTroops(player):
       print('player %d tried to assign too many troops!' % (player,))
+      return
  
-    for (i, n) in troop_assignments:
+    for (i, n) in defense_assignments:
       t = self.territories().get(num=i)
       t.private_troops = n
       t.save()
+
+    for (t1, t2, i) in attack_assignments:
+      a = self.attacks().get(origin__num=t1, target__num=t2);
+      a.private_strength = i
+      a.save()
+
     self.playerReady(player)
     self.save()
 
-  def phase1Ready(self, player, attack_strengths):
-    if self.playerIsReady(player):
-      return;
-    for (t1, t2, s) in attack_strengths:
-      attacking_territory = self.territories().get(num=t1)
-      attack = self.attacks().get(origin__num=t1, target__num=t2)
-      if attacking_territory.private_troops >= s:
-        attack.private_strength = s
-        attacking_territory.private_troops -=s
-        attack.save()
-        attacking_territory.save()
-      else:
-        print('invalid phase1ready data from player %d' % player)
-        print(attack_strengths)
-        self.resetPrivateToPublic(player)
-
-
-    # TODO this is what I need to work on
-    self.playerReady(player)
-    self.save()
-
-  def phase2Ready(self, player, mine_assignments, horse_assignments):
+  def phase1Ready(self, player, mine_assignments, horse_assignments):
     if self.playerIsReady(player):
       return;
 
@@ -334,11 +325,11 @@ class Game(models.Model):
     if total_horses > self.getAvailableHorses(player) or total_mines > self.getAvailableMines(player):
       print('invalid phase1ready data from player %d' % player) 
       self.resetPrivateToPublic(player)
-
-
     self.playerReady(player)
     self.save()
-  def phase3Ready(self, player):
+
+
+  def phase2Ready(self, player):
     if self.playerIsReady(player):
       return;
     self.playerReady(player)
@@ -373,14 +364,12 @@ class Game(models.Model):
       
   def processReadyMessage(self, player, message):
     print('in process ready message')
-    if self.phase % NUM_PHASES == 0:
-      self.phase0Ready(player,message['troop_assignments'])
-    if self.phase % NUM_PHASES == 1:
-      self.phase1Ready(player,message['attack_strengths'])
-    if self.phase % NUM_PHASES == 2:
-      self.phase2Ready(player, message['mine_assignments'], message['horse_assignments'])
-    if self.phase % NUM_PHASES == 3:
-      self.phase3Ready(player)
+    if self.getPhase() == 0:
+      self.phase0Ready(player,message['defense_assignments'], message['attack_assignments'])
+    if self.getPhase() == 1:
+      self.phase1Ready(player, message['mine_assignments'], message['horse_assignments'])
+    if self.getPhase() == 2:
+      self.phase2Ready(player)
 
   def processResetMessage(self, player):
     self.resetPrivateToPublic(player)
@@ -418,22 +407,22 @@ class Game(models.Model):
     territory_troops = list(my_troops) + list(other_troops) 
     territory_troops = [[n,t] for (n,t) in territory_troops]
 
+     # add my attacks to visible_attacks
+    my_attacks = attacks.filter(origin__in=my_territories, target__in=opponent_territories)
 
 
-    if self.getPhase() == 0: 
-      pass
-    if self.getPhase() == 1 or self.getPhase() == 2 or self.getPhase() == 3:
-      # add my attacks to visible_attacks
-      my_attacks = attacks.filter(origin__in=my_territories, target__in=opponent_territories)
-      if self.getPhase() == 3:
-        # don't show strength 0 attacks for current player
-        my_attacks = my_attacks.filter(~Q(public_strength=0)) 
-      my_attacks = my_attacks.values_list('origin__num', 'target__num')
-      my_attack_strengths = list(my_attacks.values_list('private_strength', flat=True))
-      a1 = [[i,j,s] for ((i,j), s) in zip(my_attacks, my_attack_strengths)]
-      visible_attacks += a1
 
-    if self.getPhase() == 2 or self.getPhase() == 3:
+    # add my attacks to visible_attacks
+    my_attacks = attacks.filter(origin__in=my_territories, target__in=opponent_territories)
+    if self.getPhase() == 2:
+      # don't show strength 0 attacks for current player
+      my_attacks = my_attacks.filter(~Q(public_strength=0)) 
+    my_attacks = my_attacks.values_list('origin__num', 'target__num')
+    my_attack_strengths = list(my_attacks.values_list('private_strength', flat=True))
+    a1 = [[i,j,s] for ((i,j), s) in zip(my_attacks, my_attack_strengths)]
+    visible_attacks += a1
+
+    if self.getPhase() == 1 or self.getPhase() == 2:
       # add all attacks to visible_attacks
       other_attacks = attacks.filter(~Q(origin__in=my_territories, target__in=opponent_territories))
       # don't show 0 strength attacks that aren't possible attacks for current player.
