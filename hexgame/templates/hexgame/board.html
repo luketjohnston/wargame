@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+
+{% load static %}
+
+
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Wargame</title>
+    <script type="text/javascript">
+        <!-- TODO automate this -->
+        const PLAYER = {{ player }};
+        var territory_owners = {{ territory_owners }};
+        var usernames = {{ usernames|safe }};
+        var phase = {{ phase }};
+        var turn = {{ turn }};
+        var player_ready = {{ player_ready }};
+        var gamename = {{ gamename|safe }};
+    </script>
+    <script src="{% static 'hexgame/pixi/pixi.min.js'%}"> </script>
+
+  </head>
+  <body>
+
+    <script src="{% static 'hexgame/js/interface.js' %}"> </script>
+
+  </body>
+</html>

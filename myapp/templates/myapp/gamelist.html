@@ -20,7 +20,7 @@
   <ul>
   {% for game in games %}
     <li> {{ game.0 }} 
-      <form action="{% url 'board' game.0 %}">
+      <form action="{% url 'myapp:board' game.0 %}">
       {% csrf_token %}
         <input type="submit" value="View">
       </form>
@@ -32,7 +32,7 @@
       <li> Player 1 (Green): {{ game.1}} </li> 
       {% else %}
       <li> Player 1 (Green):  
-      <form action="{% url 'joinGame' game.0 0 %}" method="post">
+      <form action="{% url 'myapp:joinGame' game.0 0 %}" method="post">
       {% csrf_token %}
         <input type="text" value="Username" id="username" name="username">
         <input type="submit" value="Join">
@@ -44,7 +44,7 @@
       <li> Player 2 (Blue): {{ game.2}} </li> 
       {% else %}
       <li> Player 2 (Blue):  
-      <form action="{% url 'joinGame' game.0 1 %}" method="post">
+      <form action="{% url 'myapp:joinGame' game.0 1 %}" method="post">
       {% csrf_token %}
         <input type="text" value="Username" id="username" name="username">
         <input type="submit" value="Join">
@@ -56,7 +56,7 @@
       <li> Player 3 (Red): {{ game.3}} </li> 
       {% else %}
       <li> Player 3 (Red):  
-      <form action="{% url 'joinGame' game.0 2 %}" method="post">
+      <form action="{% url 'myapp:joinGame' game.0 2 %}" method="post">
       {% csrf_token %}
         <input type="text" value="Username" id="username" name="username">
         <input type="submit" value="Join">
@@ -68,7 +68,7 @@
       <li> Player 4 (Yellow): {{ game.4}} </li> 
       {% else %}
       <li> Player 4 (Yellow):  
-      <form action="{% url 'joinGame' game.0 3 %}" method="post">
+      <form action="{% url 'myapp:joinGame' game.0 3 %}" method="post">
       {% csrf_token %}
         <input type="text" value="Username" id="username" name="username">
         <input type="submit" value="Join">
@@ -80,7 +80,7 @@
   {% endfor %}
 
   <li> 
-    <form action="{% url 'createGame' %}" method="post">
+    <form action="{% url 'myapp:createGame' %}" method="post">
     {% csrf_token %}
       Create game named:
       <input type="text" id="gamename" name="gamename">

@@ -39,13 +39,14 @@ def gamelist(request):
   return render(request, 'myapp/gamelist.html', context)
 
 def createGame(request):
+  print("IN myapp createGame")
   gamename = request.POST['gamename']
   try:
     game = Game.objects.get(name=gamename)
     return HttpResponse('A game with that name already exists!')
   except ObjectDoesNotExist:
     game = Game.objects.createGame(gamename);
-    return redirect('gamelist')
+    return redirect('myapp:gamelist')
 
 def joinGame(request, gamename, player):
   username = request.POST['username']
@@ -68,4 +69,4 @@ def joinGame(request, gamename, player):
     game.player4key = request.session.session_key
   game.save()
     
-  return redirect('gamelist')
+  return redirect('myapp:gamelist')

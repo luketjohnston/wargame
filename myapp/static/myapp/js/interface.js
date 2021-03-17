@@ -163,17 +163,6 @@ function updateTurnSprites() {
 
 function update() {
 
-
-  //console.log('in update')
-  //console.log('territory_owners')
-  //console.log(territory_owners)
-  //console.log('phase')
-  //console.log(phase)
-  //console.log('territory_troops')
-  //console.log(territory_troops)
-
-
-
   // set territory owners
   for (let i=0; i < num_territories; i++) {
     markers[i].updateOwner(territory_owners[i]);
@@ -284,7 +273,6 @@ function makeReadyButton() {
   ready.beginFill(0xFFFFFF);
   ready.drawRect(0,0,200, 40)
   ready.endFill();
-
 
   let text = new PIXI.Text("Ready");
   text.x = 0;
@@ -780,7 +768,6 @@ chatSocket.onclose = onclose
 function sendResetToServer() {
   chatSocket.send(JSON.stringify({'reset' : true}))
 }
-
 
 function sendReadyToServer() {
   //console.log('sending reayd')

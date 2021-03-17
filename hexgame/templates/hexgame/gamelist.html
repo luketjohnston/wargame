@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+
+{% load static %}
+
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Wargame</title>
+    <script type="text/javascript">
+        <!-- TODO automate this -->
+        const DJANGO_STATIC_URL = '/static/';
+    </script>
+    <script src="{% static 'hexgame/pixi/pixi.min.js'%}"> </script>
+
+  </head>
+  <body>
+
+  <h1> Game list: </h1>
+
+  <ul>
+  {% for game in games %}
+    <li> {{ game.0 }} 
+
+      <form action="{% url 'hexgame:joinGame' game.0  %}" method="post">
+      {% csrf_token %}
+        <input type="text" value="Username" id="username" name="username">
+        <input type="submit" value="Join">
+      </form>
+
+    </li> 
+  {% endfor %}
+
+  <li> 
+    <form action="{% url 'hexgame:createGame' %}" method="post">
+    {% csrf_token %}
+      Create game named:
+      <input type="text" id="gamename" name="gamename">
+      <input type="submit" value="Create">
+    </form>
+  </ul>
+
+
+  <h1> How to play: </h1>
+
+  This is war game inspired by risk and diplomacy with an experimental turn system. In many free for all games, when one player is about to win, all other players have no choice but to team up on them to prevent the game from ending. I never particularly enjoyed this mechanic, so this game is an attempt to make a free for all game where teaming up is impossible. The attempted "solution" is to only allow players to interact on a 1v1 basis - effectively, the 4-player game is decomposed into a series of 2-player games. 
+
+  <h2> Turns, and rounds </h2>
+  In a each <b> turn </b> of this game, players can only interact on a 1v1 basis. For example, in turn one, the Blue and Green players interact, while the Red and Yellow players interact completely independently. The Blue/Green interaction cannot effect the Red/Yellow interaction, and visa versa. On the next turn, the 1v1 interactions are shuffled - Blue and Red interact while Green and Yellow interact independently. The full turn order is:
+  <ul>
+    <li> (Green vs Blue) and (Red vs Yellow) </li>
+    <li> (Green vs Red) and (Blue vs Yellow) </li>
+    <li> (Green vs Yellow) and (Blue vs Red) </li>
+  </ul>
+  After three turns, all possible pairings have interacted, and so this ends a <b> round </b>. The game can consist of as many rounds as you like, or any other end condition - no official end is implemented. I recommend either playing for 3 rounds, or playing until one player can field 20 available troops at the end of a round (see gameplay section). Then, the player controlling the most territories is the winner.
+
+  <h2> Gameplay and phases </h2>
+  Each turn consists of 4 phases. 
+  <h3> Phase 1 </h3>
+  In phase 1, each players assigns troops to territories they control. The number of available troops each player has is equal to the number of territories they control, plus the number of <b> farms </b> in territories they control. However, every player always receives a minimum of 10 troops to field. So even if a player only controls 3 territories with no farms, they will still be able to field 10 troops. During this phase, all players are making their troop assignments simultaneously, and none can see the others' troop assignments until the beginning of phase 2.
+  <h3> Phase 2 </h3>
+  In phase 2, troop assignments of all opponents are revealed. Then, each player assigns attacks simultaneously. For each troop assigned to a territory during phase 1, you can decide to leave that troop there to defend, or send it to attack an adjacent territory. Combat is explained in detail in the section for phase 4. During this phase, players are assigning attacks simultaneously, and no player can see other players' attacks until the beginning of phase 3. Attacks made are not resolved until phase 4.
+  <h3> Phase 3 </h3>
+  In phase 3, all attacks assigned in phase 2 are revealed. During this phase, players can use their available <b> horses </b> and <b> mines </b> to react to their opponent's attacks. Each available horse allows a player to add an additional troop to a single attack, and each available mine allows a player to add an additional troop to a single territory to defend. The number of horses a player has available is equal to the number of territories they control with the horse icon, and the number of mines they have available is equal to the number of territories they control with a mine icon. Assignments of horses and mines occurr simultaneously among all players, and are not revealed until phase 4.
+
+  <h4> Phase 4 </h4> In phase 4, the final attacking and defending strengths are revealed (with their final modifications from phase 3). During this phase, players do not take any action, it only exists so that players can see what actions where made by their opponents in phase 3 before all attacks are resolved. Combat is resolved like this: first, the number of defending troops in a territory is multiplied by 2. This is the base defending strength of the territory. Then, the <b> mountain </b> defense modifier is added - +1 to the defending strength of territories that contain mountains (territories 36-40 in the center of the map). The attacking strength of each attack is equal to the number of troops assigned to that attack, minus 1 for attacks that cross <b> rivers </b>. Then, the defending strenght of a territory is compared to the sum of all attacks against that territory. If the defending strength is strictly less than the sum of attacking strengths, the attack succeeds and the territory exchanges ownership to the attacker. Otherwise, the attack fails and the owner keeps the defending territory. After phase 4, the turn progresses (players face new opponents) and play continues at phase 1.
+
+
+<h2> Interface details </h2>
+To assign troops, attacks, horses, or mines in any valid phase, click the corresponding circle in the center of a territory, or triangle crossing the border that you wish to attack across (only visible in phases 2,3, and 4). To remove an assigned troop, attack, mine, or horse, <b> Shift-click </b> the corresponding circle or triangle. When you are ready for the next phase, click the "Ready" box. You can see who your current opponent is by looking at the turn indicators in the upper left of the board. You can see which other players are ready by looking at the circles in the upper left, below the turn indicator. You can "unready" by clicking the "reset" box, which will remove all assignments made in the current phase so you can redo them. Available troops, horses, and mines for you (and horses and mines for your opponent) are displayed below the reset button on the right of the board.
+  
+  
+    
+
+  </body>
+</html>
