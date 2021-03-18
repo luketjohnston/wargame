@@ -1,3 +1,6 @@
+// TODOS:
+// remap scroll event to move board
+
 const num_territories = 40;
 const TILE_WIDTH = 130;
 const BORDER_WIDTH = 25
@@ -6,6 +9,16 @@ BORDER_FILTER.alpha = 0.1;
 const BORDER_CONT = new PIXI.Container();
 BORDER_CONT.filters = [BORDER_FILTER];
 const BOARD_SPEED = 10
+const DISP_WIDTH = 400;
+
+const TEXT_STYLE = new PIXI.TextStyle({
+  font: "PetMe64",
+  fill: "white",
+  dropShadow: true,
+  dropShadowColor: '#000000',
+  dropShadowAngle: '0',
+
+});
 
 const leftKey = keyboard("ArrowLeft");
 const upKey = keyboard("ArrowUp");
@@ -44,6 +57,8 @@ var available_troops;
 var readyButton;
 var combatIndicators = [];
 var readyIndicators = [];
+var borderDisplay;
+var selectedBorder;
 
 const playerColors = [0x2B7255, 0x094788, 0x8C0101, 0x9EA006, 0xEBA834, 0x9E9E9E, 0xB11FD1]
 const board_edge_width = 6
@@ -84,7 +99,10 @@ function setup() {
 
   // TODO is this necessary?
   app.renderer.autoDensity = true;
-  app.renderer.resize(2000, 2000);
+  app.renderer.view.style.position = "absolute";
+  app.renderer.view.style.display = "block";
+  app.renderer.autoResize = true;
+  app.renderer.resize(window.innerWidth, window.innerHeight);
 
   // 'board edge width
   bw = board_edge_width
@@ -101,7 +119,9 @@ function setup() {
 
   makeReadyButton();
   createPlayerList();
+  borderDisplay = makeBorderDisplay();
   update();
+  
 
   //Start the game loop 
   app.ticker.add(delta => gameLoop(delta));
@@ -153,7 +173,8 @@ function addPlayer(username, num) {
 
 function createPlayerList() {
   gameText = new PIXI.Text(gamename);
-  gameText.style = {fill: 'white', fontSize: "46px"}
+  Object.assign(gameText.style, TEXT_STYLE)
+  gameText.style.fontSize = '46px'
   gameText.x = 20;
   gameText.y = 20;
   app.stage.addChild(gameText);
@@ -161,6 +182,123 @@ function createPlayerList() {
   for (let i = 0; i < usernames.length; i++) {
     addPlayer(usernames[i], i)
   }
+}
+
+function makeBorderDisplay() {
+  let margin = 20
+  let yoffset = 20
+  let xoffset = 20
+
+  dispRect = new PIXI.Graphics()
+  dispRect.beginFill(0x000000);
+  dispRect.drawRect(0,0,DISP_WIDTH, app.renderer.height - 2 * margin)
+  dispRect.x = app.renderer.width - DISP_WIDTH - margin
+  dispRect.y = margin
+  dispRect.endFill();
+  dispRect.alpha = 0.9;
+  app.stage.addChild(dispRect)
+
+  let t1 = new PIXI.Text('Available troops:')
+  t1.style = TEXT_STYLE
+  t1.x = 20
+  t1.y = yoffset
+  yoffset += 80
+  t1.style = {fill: 0xFFFFFF, font: "16px PetMe64"}
+  dispRect.addChild(t1)
+
+
+  for (let i = 0; i < usernames.length; i++) {
+    let r = new PIXI.Graphics();
+    r.beginFill(playerColors[i]);
+    r.drawRect(20,yoffset - margin,35,35)
+    r.endFill();
+    let indicator = new PIXI.Text('p' + String(i + 1));
+    indicator.x = 24;
+    indicator.y = yoffset + 4 - margin;
+
+    let count = new PIXI.Text('0');
+    count.style = TEXT_STYLE
+    count.x = 90;
+    count.y = yoffset + 4 - margin;
+    dispRect.addChild(r)
+    dispRect.addChild(indicator)
+    dispRect.addChild(count)
+    yoffset += 60
+
+    dispRect.addChild(r)
+    dispRect.addChild(indicator)
+  }
+
+  brk = new PIXI.Graphics();
+  brk.beginFill(0xFFFFFF)
+  brk_margin = margin * 2
+  brk.drawRect(brk_margin,yoffset,DISP_WIDTH - 2 * brk_margin, 5)
+  yoffset += 60
+  brk.endFill()
+  dispRect.addChild(brk)
+
+  let selectMessage = new PIXI.Text('Click a border to assign troops');
+  selectMessage.style = TEXT_STYLE
+  selectMessage.x = 24;
+  selectMessage.y = yoffset + 4 - margin;
+  dispRect.addChild(selectMessage)
+
+  
+  let detailContainer = new PIXI.Container()
+  dispRect.addChild(detailContainer)
+
+  let newDescriptor = function(txt, i) {
+    t = new PIXI.Text(txt)
+    t.x = 20
+    t.y = yoffset
+    t.style = TEXT_STYLE
+
+    v = new PIXI.Text('0')
+    v.x = DISP_WIDTH - 30
+    v.y = yoffset
+    v.style = TEXT_STYLE
+    yoffset += 60
+
+    v.setVal = function(val) {
+      v.text = String(val)
+    }
+
+    detailContainer.addChild(t)
+    detailContainer.addChild(v)
+    return v
+  }
+  detailContainer.visible = false
+
+  attacks = newDescriptor('Assigned attacking troops:', 0)
+  defends = newDescriptor('Assigned defending troops:', 1)
+  attack_s = newDescriptor('Total attacking strength:', 2)
+  defend_s = newDescriptor('Total defending strength:', 3)
+
+  dispRect.setAttacks = function(a) {
+    attacks.text = String(a)
+  }
+  dispRect.setDefends = function(a) {
+    defends.text = String(a)
+  }
+  dispRect.setAttackStrength = function(a) {
+    attack_s.text = String(a)
+  }
+  dispRect.setDefendStrength = function(a) {
+    defend_s.text = String(a)
+  }
+
+  dispRect.showBorder = function(i1,j1,i2,j2) {
+    selectMessage.visible = false
+    detailContainer.visible = true
+  }
+  dispRect.hideBorderInfo = function() {
+    selectMessage.visible = true
+    detailContainer.visible = false
+  }
+
+  return dispRect
+
+
 }
 
 function makeReadyButton() {
@@ -267,7 +405,7 @@ function drawBorder(i1,j1,i2,j2) {
     border.x = cx;
     border.y = cy;
 
-
+    border.buttonMode = true;
     border.interactive = true;
   
     let smalldist = (radius - BORDER_WIDTH * Math.cos(Math.PI/6))
@@ -277,10 +415,42 @@ function drawBorder(i1,j1,i2,j2) {
       Math.cos(theta + Math.PI/6) * radius, Math.sin(theta + Math.PI/6) * radius,
       Math.cos(theta + Math.PI/6) * (smalldist), Math.sin(theta + Math.PI/6) * (smalldist),
     ]
+
+    // need to make invisible element that is only shown when
+    // a border is selected
+    let selection = new PIXI.Graphics();
+    selection.lineStyle(3,0x000000,1);
+    selection.drawPolygon(path)
+    selection.x = cx;
+    selection.y = cy;
+    selection.alpha = 0.8
+    selection.visible = false
+    app.stage.addChild(selection)
+
+
     border.hitArea = new PIXI.Polygon(path2);
-    border.mouseover = function(mouseData) {
-      console.log("IN mouseOVER")
+    border.ijij = [i1,j1,i2,j2]
+    border.alpha = 1
+    let click = function() {
+      selectedBorder = border
     }
+    let mouseover = function() {
+      selection.visible = true
+    }
+    let mouseout = function() {
+      selection.visible = false
+     }      
+
+
+    border
+      .on('mouseup', click)
+      .on('touchend', click)
+      .on('mouseupoutside', click)
+      .on('touchendoutside', click)
+      .on('mouseover', mouseover)
+      .on('mouseout', mouseout)
+
+
     borders[i1][j1][i2-i1 + 1][j2-j1 + 1] = border;
     BORDER_CONT.addChild(border)
 
@@ -370,6 +540,13 @@ function onclose(e) {
   //  chatSocket.onclose = onclose;
   //  }, 10000);
 };
+
+window.onresize = function() {
+  app.renderer.resize(window.innerWidth, window.innerHeight);
+  app.stage.removeChild(borderDisplay);
+  borderDisplay = makeBorderDisplay();
+}
+  
 
 
 chatSocket.onmessage = onmessage
