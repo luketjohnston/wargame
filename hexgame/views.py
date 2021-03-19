@@ -23,7 +23,7 @@ def board(request, gamename):
     game = Game(gamename);
     game.save();
   player = Player.objects.get(key=key,game=game)
-  context = game.getGamestateContext(player.num);
+  context = game.getGamestateContext(player);
 
   return render(request, 'hexgame/board.html', context)
 
