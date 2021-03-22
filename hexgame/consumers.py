@@ -96,5 +96,5 @@ class GameConsumer(WebsocketConsumer):
     self.send(json.dumps({'playerReadyMessage' : [int(game.player_ready[i] == '1') for i in range(game.numPlayers())]}))
   def playerJoined(self, event):
     game = Game.objects.get(name=self.gamename)
-    self.send(json.dumps(game.getGamestate(self.player)))
+    self.send(json.dumps({'playerJoined' : {'username': event['username'], 'num': event['num']}}))
     

@@ -1,4 +1,4 @@
-import {packageGamestate, updateReadyIndicators, updateGamestate, update} from './interface.js'
+import {addPlayer, packageGamestate, updateReadyIndicators, updateGamestate} from './interface.js'
 
 const protocol =  window.location.protocol === 'https:' ? 'wss' : 'ws' 
 
@@ -19,9 +19,10 @@ function onmessage(e) {
   if ('playerReadyMessage' in message) {
     player_ready = message['playerReadyMessage']
     updateReadyIndicators();
+  } else if ('playerJoined' in message) {
+    addPlayer(message['playerJoined']['username'], message['playerJoined']['num'])
   } else {
     updateGamestate(message);
-    update();
   }
 };
 
@@ -55,7 +56,6 @@ function readyMessage() {
 }
 
 function assignmentMessage(i1,j1,i2,j2,attack) {
-  console.log('sending assignment')
   chatSocket.send(JSON.stringify({'assignment': [i1,j1,i2,j2,attack]}))
 }
 

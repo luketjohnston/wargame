@@ -57,6 +57,8 @@ def joinGame(request, gamename):
   num_players = len(game.player_ready)
   key = request.session.session_key
   try:
+    print(key)
+    print(game)
     player = Player.objects.get(key=key,game=game)
   except ObjectDoesNotExist:
     player = Player(username=username,key=key,game=game,num=num_players)
@@ -66,7 +68,9 @@ def joinGame(request, gamename):
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(
         game.name,
-        {'type': 'playerJoined'}
+        {'type': 'playerJoined',
+         'username': username,
+         'num': num_players}
     )    
 
   return redirect('hexgame:board', gamename)

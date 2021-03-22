@@ -10,7 +10,6 @@ import {resetMessage, readyMessage, assignmentMessage} from './messaging.js'
 // makes the board move slower... why would this be? very odd
 
 const MAX_PLAYERS = 10
-var availableTroops = Array(MAX_PLAYERS).fill(0)
 
 const TEXT_STYLE = new PIXI.TextStyle({
   font: "PetMe64",
@@ -51,10 +50,12 @@ let app = new PIXI.Application({width: 256, height: 256});
 // territory_owners, visible_attacks
 // phase, turn, round, 
 // available_troops, available_horses, available_mines,
+// tilesetURL
 
 document.body.appendChild(app.view);
 
 PIXI.Loader.shared
+  .add(tilesetURL)
   .load(setup);
 
 function setup() {
@@ -64,7 +65,6 @@ function setup() {
   app.renderer.autoDensity = true;
   app.renderer.view.style.position = "absolute";
   app.renderer.view.style.display = "block";
-  app.renderer.autoResize = true;
   app.renderer.resize(window.innerWidth, window.innerHeight);
 
   // 'board edge width
@@ -85,8 +85,21 @@ function setup() {
 
   createPlayerList();
   makeRightDisplay(app);
-  update();
-  
+  if (rightDisplay.updateTroops !== undefined) {
+    rightDisplay.updateTroops(available_troops);
+  }
+  for (let [i,j,owner] of territory_owners) {
+    territory[i][j].setOwner(owner);
+  }
+  updateBorderVisibles(territory, hex_indices)
+  updateReadyIndicators();
+
+  console.log('assignments')
+  console.log(assignments)
+
+  for (let [i1,j1,i2,j2,attack,defend,as,ds] of assignments) {
+    borders[i1][j1][i2-i1+1][j2-j1+1].update(attack,defend,as,ds)
+  }
 
   //Start the game loop 
   app.ticker.add(delta => gameLoop(delta));
@@ -122,6 +135,8 @@ ESC.press = unselectBorder
 
 
 function addPlayer(username, num) { 
+    usernames.length = Math.max(num, usernames.length)
+    usernames[num] = username
     let r = new PIXI.Graphics();
     r.beginFill(PLAYER_COLORS[num]);
     r.drawRect(20,100+60*num,35,35)
@@ -177,18 +192,6 @@ function updateReadyIndicators() {
 }
 
 
-function update() {
-  console.log(territory_owners)
-
-  for (let [i,j,owner] of territory_owners) {
-    territory[i][j].setOwner(owner);
-  }
-  
-  updateBorderVisibles(territory, hex_indices)
-
-  updateReadyIndicators();
-}
-
 function packageGamestate() {
   return JSON.stringify({ready_to_start: true})
   //if (phase == -1) {
@@ -197,15 +200,15 @@ function packageGamestate() {
 
 function updateGamestate(gamestate) {
   
-  console.log('gamestate')
-  console.log(gamestate)
+  console.log('updateGamestate')
 
   if ('assignments' in gamestate) {
     for (let [i1,j1,i2,j2,attack,defend,as,ds] of gamestate['assignments']) {
-      borders[i1][j1][i2][j2].update(attack,defend,as,ds)
+      borders[i1][j1][i2-i1+1][j2-j1+1].update(attack,defend,as,ds)
     }
   }
-  if ('troopUpdate' in gamestate) {
+  if ('troopUpdate' in gamestate && rightDisplay.updateTroops !== undefined) {
+    console.log("in troopUpdate")
     rightDisplay.updateTroops(gamestate['troopUpdate'])
   }
 
@@ -215,18 +218,28 @@ function updateGamestate(gamestate) {
   }
 
   if ('usernames' in gamestate) {
-    console.log('adding usernames')
     for (let i = readyIndicators.length; 
          i < gamestate['usernames'].length; i++) {
-      console.log(gamestate['usernames'][i])
-      console.log(i)
       addPlayer(gamestate['usernames'][i],i)
     }
   }
 
   if ('territory_owners' in gamestate) {
     territory_owners = gamestate.territory_owners; }
+    for (let [i,j,owner] of territory_owners) {
+      territory[i][j].setOwner(owner);
+      updateBorderVisibles(territory, hex_indices)
+    }
   if ('phase' in gamestate) {
+    console.log('in phase processing')
+    console.log(phase)
+    if (phase == -1) {
+      console.log('calling makeRightDisplay')
+      rightDisplay.startGame()
+    }
+    if (phase >= 0 && rightDisplay.troopList === undefined) {
+      rightDisplay.startGame()
+    }
     phase = gamestate.phase; }
   if ('turn' in gamestate) {
     turn = gamestate.turn; }
@@ -235,11 +248,9 @@ function updateGamestate(gamestate) {
 }
 
 
-
 window.onresize = function() {
   app.renderer.resize(window.innerWidth, window.innerHeight);
-  app.stage.removeChild(rightDisplay);
-  makeRightDisplay(app);
+  rightDisplay.updateSize();
 }
 
 
@@ -290,5 +301,5 @@ function keyboard(value) {
   return key;
 }
 
-export {update, updateReadyIndicators, updateGamestate, availableTroops, packageGamestate}
+export {updateReadyIndicators, updateGamestate, packageGamestate, addPlayer}
   
