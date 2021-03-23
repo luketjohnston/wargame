@@ -1,6 +1,7 @@
 import {BOARD_CONTAINER, BOARD_EDGE_WIDTH, TILE_WIDTH, territory, getX, getY } from './board.js'
 import {rightDisplay} from './display.js'
 import {vecFromPolar} from './utils.js'
+import {sheet} from './interface.js'
 
 const BORDER_FILTER = new PIXI.filters.AlphaFilter();
 BORDER_FILTER.alpha = 0.1;
@@ -174,11 +175,8 @@ function updateTroopDisplay(border) {
   cont.removeChildren()
   cont.x = border.x
   cont.y = border.y
-  let rec1 = new PIXI.Rectangle(0,0,200,200)
-  let base = new PIXI.BaseTexture.from(tilesetURL)
-  let sword_texture = new PIXI.Texture(base, rec1)
   for (let i = 0; i < border.attack_t; i++) {
-    let sword = new PIXI.Sprite.from(sword_texture)
+    let sword = new PIXI.Sprite.from(sheet.textures["sword1.png"])
     sword.scale.set(0.1,0.1)
     if (border.attack_t > 1) {
       let minx = - TILE_WIDTH / 7  - sword.width / 2
@@ -191,10 +189,8 @@ function updateTroopDisplay(border) {
     cont.addChild(sword)
   }
 
-  let rec2 = new PIXI.Rectangle(0,200,200,200)
-  let shield_texture = new PIXI.Texture(base, rec2)
   for (let i = 0; i < border.defend_t; i++) {
-    let shield = new PIXI.Sprite.from(shield_texture)
+    let shield = new PIXI.Sprite.from(sheet.textures["shield1.png"])
     shield.scale.set(0.1,0.1)
     if (border.defend_t > 1) {
       let minx = - TILE_WIDTH / 7  - shield.width / 2

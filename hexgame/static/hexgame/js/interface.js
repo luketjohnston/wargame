@@ -44,6 +44,7 @@ if(!PIXI.utils.isWebGLSupported()){
 PIXI.utils.sayHello(type)
 
 let app = new PIXI.Application({width: 256, height: 256});
+var sheet;
 
 // the following are set by board.html:
 // player, readies, gamename
@@ -55,12 +56,13 @@ let app = new PIXI.Application({width: 256, height: 256});
 document.body.appendChild(app.view);
 
 PIXI.Loader.shared
-  .add(tilesetURL)
+  .add(spritesheetURL)
   .load(setup);
 
 function setup() {
   // this code will run whent he loader has finished loading the image
 
+  sheet = PIXI.Loader.shared.resources[spritesheetURL]
   // TODO is this necessary?
   app.renderer.autoDensity = true;
   app.renderer.view.style.position = "absolute";
@@ -304,5 +306,5 @@ function keyboard(value) {
   return key;
 }
 
-export {updateReadyIndicators, updateGamestate, packageGamestate, addPlayer}
+export {sheet, updateReadyIndicators, updateGamestate, packageGamestate, addPlayer}
   
