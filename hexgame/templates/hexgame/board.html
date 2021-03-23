@@ -4,6 +4,8 @@
 
 
 <html>
+  <!-- so PIXI can resize to fit window -->
+  <style>* {padding: 0; margin: 0}</style>
   <head>
     <meta charset="utf-8">
     <title>Wargame</title>
@@ -16,13 +18,16 @@
         var turn = {{ turn }};
         var player_ready = {{ player_ready }};
         var gamename = {{ gamename|safe }};
+        var available_troops = {{ available_troops }};
+        var assignments = {{ assignments }};
+        var tilesetURL = "{% static 'hexgame/images/tileset.png'%}";
     </script>
     <script src="{% static 'hexgame/pixi/pixi.min.js'%}"> </script>
 
   </head>
   <body>
 
-    <script src="{% static 'hexgame/js/interface.js' %}"> </script>
+    <script type='module' src="{% static 'hexgame/js/interface.js' %}"> </script>
 
   </body>
 </html>

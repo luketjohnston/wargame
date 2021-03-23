@@ -10,7 +10,7 @@ class GameConsumer(WebsocketConsumer):
     print('self.gamename above')
     self.session_key = self.scope['session'].session_key
     game = Game.objects.get(name=self.gamename)
-    self.player = Player.objects.get(key=self.session_key, game=game).num
+    self.player = Player.objects.get(key=self.session_key, game=game)
     self.room_group_name = self.gamename
     
     async_to_sync(self.channel_layer.group_add)(
@@ -39,10 +39,16 @@ class GameConsumer(WebsocketConsumer):
         self.room_group_name,
         {
           'type': 'playerReset',
-          'player': self.player,
+          'playerNum': self.player.num,
         }
       )
       return
+    if 'assignment' in message:
+      message = game.processAssignment(self.player, message)
+      s = json.dumps(message)
+      self.send(s)
+      return
+      
 
     game.processReadyMessage(self.player, message)
     print(game.player_ready)
@@ -64,7 +70,7 @@ class GameConsumer(WebsocketConsumer):
         self.room_group_name,
         {
           'type': 'playerReady',
-          'player': self.player,
+          'playerNum': self.player.num,
         }
       )
 
@@ -78,7 +84,7 @@ class GameConsumer(WebsocketConsumer):
 
   def playerReset(self, event):
     game = Game.objects.get(name=self.gamename)
-    if event['player'] == self.player:
+    if event['player'] == self.player.num:
       gamestate = game.getGamestate(self.player)
       self.send(text_data=json.dumps(gamestate))
     else:
@@ -90,5 +96,5 @@ class GameConsumer(WebsocketConsumer):
     self.send(json.dumps({'playerReadyMessage' : [int(game.player_ready[i] == '1') for i in range(game.numPlayers())]}))
   def playerJoined(self, event):
     game = Game.objects.get(name=self.gamename)
-    self.send(json.dumps(game.getGamestate(self.player)))
+    self.send(json.dumps({'playerJoined' : {'username': event['username'], 'num': event['num']}}))
     
