@@ -54,7 +54,7 @@ def joinGame(request, gamename):
   print(request.POST)
   username = request.POST['username']
   game = Game.objects.get(name=gamename)
-  num_players = len(game.player_ready)
+  num_players = len(Player.objects.filter(game=game))
   key = request.session.session_key
   try:
     print(key)
@@ -62,12 +62,11 @@ def joinGame(request, gamename):
     player = Player.objects.get(key=key,game=game)
   except ObjectDoesNotExist:
     player = Player(username=username,key=key,game=game,num=num_players)
-    game.player_ready = game.player_ready + '0'
     player.save()
     game.save()
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(
-        game.name,
+        str(game.id),
         {'type': 'playerJoined',
          'username': username,
          'num': num_players}

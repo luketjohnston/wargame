@@ -5,10 +5,11 @@ from django.db.models import F
 import json
 import random
 
+TERRAIN = ['desert', 'forest', 'hills', 'plains', 'mountain']
 INVALID_MESSAGE = 'invalid'
 
-NUM_PHASES = 3
-NUM_TURNS = 3
+NUM_PHASES = 2
+NUM_TURNS = 10
 BOARD_EDGE_WIDTH = 6
 
 # bw = board edge width
@@ -25,33 +26,44 @@ def getTerritoryIndices(bw):
 class Game(models.Model):
   # TODO how many phases?
   phase = models.IntegerField(default=-1)
-  player_ready = models.CharField(max_length=50, default='')
   name = models.CharField(max_length=50)
 
   @classmethod
   def create(cls, gamename):
     if Game.objects.get(name=gamename):
       raise Exception("game %s already exists" % gamename)
+    if not gamename:
+      raise Exception("gamename cannot be empty!")
     game = cls(gamename, len(players))
     game.save()
+
+
     return game
 
   def createBalancedStart(self):
     territories = getTerritoryIndices(BOARD_EDGE_WIDTH)
     starting_num = len(territories) // self.numPlayers()
     players = list(range(self.numPlayers())) * starting_num
+    players += [-1] * (len(territories) - len(players))
     random.shuffle(territories);
     return zip(territories, players)
 
   def startGame(self):
-    #assert(len(self.player_ready) >= 2, 'tried to start game with less than 2 players')
+    # assert 2 players?
     owners = list(self.createBalancedStart())
     if Territory.objects.filter(game=self):
       print('Tried to start game that is already started')
       return
     for (i,j),owner in owners:
-      p = Player.objects.get(num=owner, game=self)
-      Territory(i=i,j=j,owner=p,game=self).save()
+      if owner == -1:
+        t = Territory(i=i,j=j,owner=None,game=self)
+        t.terrain = 0
+        t.save()
+      else:
+        p = Player.objects.get(num=owner, game=self)
+        t = Territory(i=i,j=j,owner=p,game=self)
+        t.terrain = random.randrange(1,len(TERRAIN))
+        t.save()
     
     for (i,j),owner in owners:
       t1 = Territory.objects.get(i=i,j=j,game=self)
@@ -69,8 +81,7 @@ class Game(models.Model):
         if not opponent == p:
           tc = TroopCounter(game=self, player=p, opponent=opponent, available=5, max_available=5)
           tc.save()
-
-    self.player_ready = '0' * self.numPlayers()
+    # TODO do we need this save?
     self.save()
 
   def getTurn(self):
@@ -79,12 +90,11 @@ class Game(models.Model):
 
   # updates gamestate to indicate player is ready for next phase
   def playerReady(self, player):
-    self.player_ready = self.player_ready[:player.num] + '1' + self.player_ready[player.num+1:]
-    self.save()
+    player.ready=True
+    player.save()
 
   def processReadyMessage(self, player, message):
     print('in process ready message')
-    #if self.getPhase() == -1:
     self.playerReady(player)
 
   def processAssignment(self, player, message):
@@ -97,14 +107,14 @@ class Game(models.Model):
 
   # updates gamestate to indicate player is not ready for next phase
   def playerNotReady(self, player):
-    self.player_ready = self.player_ready[:player.num] + '0' + self.player_ready[player.num+1:]
-    self.save()
+    player.ready = False
+    player.save()
 
   def allReady(self):
-    return self.player_ready == '1' * self.numPlayers()
+    return all(Player.objects.filter(game=self).values_list('ready', flat=True))
  
   def numPlayers(self):
-    return len(self.player_ready)
+    return len(Player.objects.filter(game=self))
 
   def resolveAttacks(self):
     attacks = Border.objects.filter(game=self)
@@ -120,6 +130,7 @@ class Game(models.Model):
     for tc in TroopCounter.objects.filter(game=self):
       tc.available = tc.max_available
       tc.save()
+    Border.objects.filter(game=self).update(attack=0,defend=0)
         
 
   def allReadyUpdate(self):
@@ -127,9 +138,12 @@ class Game(models.Model):
     if (self.getPhase() == -1):
       self.startGame()
       self.save()
-    if (self.getPhase() >= 0):
+    if (self.getPhase() % 2 == 0):
+      pass
+    if (self.getPhase() % 2 == 1):
       self.resolveAttacks()
 
+    Player.objects.filter(game=self).update(ready=False)
     self.phase += 1
     self.save()
       
@@ -144,57 +158,79 @@ class Game(models.Model):
     return Territory.objects.filter(game=self)
 
   def playerIsReady(self, player):
-    return self.player_ready[player] == '1'
+    return player.ready
 
   def getPhase(self):
     if self.phase == -1: return -1
     return self.phase % NUM_PHASES
+  
+  def readies(self):
+    return list(Player.objects.filter(game=self).values_list('ready', flat=True).order_by('num'))
+
+  def getOwners(self):
+    return list(self.territories().values_list('i', 'j', 'owner__num'))
+
+  def getUsernames(self):
+    return list(Player.objects.filter(game=self).values_list('username',flat=True))
+
+  def getAssignment(self, player):
+    assignment = []
+    opponent_strengths = []
+    own_borders = Border.objects.filter(game=self, t1__owner=player)
+    all_borders = Border.objects.filter(game=self)
+    if self.getPhase() == -1:
+      pass
+    elif self.getPhase() == 0:
+      assignment = own_borders
+    elif self.getPhase() == 1:
+      assignment = all_borders
+
+    return [(a.t1.i, a.t1.j, a.t2.i, a.t2.j, a.attack, a.defend, a.attackStrength(), a.defendStrength()) for a in assignment]
+
+  def getOppStrengths(self, player):
+    opp_borders = Border.objects.filter(game=self).exclude(t1__owner=player)
+    return [(b.t1.i, b.t1.j, b.t2.i, b.t2.j, b.baseAttackStrength(), b.baseDefendStrength()) for b in opp_borders]
+
+  def getAvailableTroops(self, player):
+    tc = TroopCounter.objects.filter(game=self, player=player)
+    return list(tc.values_list('opponent__num', 'available'))
+
+  def getTerrain(self):
+    return list(Territory.objects.filter(game=self).values_list('i', 'j', 'terrain'))
+    
 
   def getGamestate(self, player):
-    territories = Territory.objects.filter(game=self)
-    territory_owners = territories.values_list('i', 'j', 'owner__num')
-    usernames = Player.objects.filter(game=self).values_list('username',flat=True)
-
-    #assignment = Border.objects.filter(game=self, t1__owner=player).values_list('t1__i','t1__j','t2__i','t2__j','attack','defend')
-    #def getBorder(a):
-    #  return Border.objects.get(t1__i=a[0],t1__j=a[1],t2__i=a[2],t2__j=a[3],game=self, t1__owner=player)
-    #assignment = [a + (getBorder(a).attackStrength(), getBorder(a).defendStrength()) for a in assignment]
-
-    assignment = Border.objects.filter(game=self).values_list('t1__i','t1__j','t2__i','t2__j','attack','defend')
-    def getBorder(a):
-      return Border.objects.get(t1__i=a[0],t1__j=a[1],t2__i=a[2],t2__j=a[3],game=self)
-    assignment = [a + (getBorder(a).attackStrength(), getBorder(a).defendStrength()) for a in assignment]
-
-    tc = TroopCounter.objects.filter(game=self, player=player)
-    available = tc.values_list('opponent__num', 'available')
-
     context = {
       'player' : player.num,
-      'assignments' : assignment,
-      'usernames' : list(usernames),
-      'territory_owners' : list(territory_owners),
+      'assignments' : self.getAssignment(player),
+      'opponent_strengths' : self.getOppStrengths(player),
+      'usernames' : self.getUsernames(),
+      'territory_owners' : self.getOwners(),
       'phase': self.getPhase(),
       'turn': self.getTurn(),
-      'player_ready': [int(pr=='1') for pr in self.player_ready],
+      'readies': self.readies(),
       'gamename': self.name,
-      'available_troops': list(available),
+      'available_troops': self.getAvailableTroops(player),
     }
     return context
 
   def getGamestateContext(self, player):
     gamestate = self.getGamestate(player)
     gamestate['usernames'] = json.dumps(gamestate['usernames'])
+    gamestate['readies'] = json.dumps(gamestate['readies'])
     gamestate['territory_owners'] = json.dumps(gamestate['territory_owners'])
     gamestate['gamename'] = json.dumps(gamestate['gamename'])
     gamestate['assignments'] = json.dumps(gamestate['assignments'])
     gamestate['available_troops'] = json.dumps(gamestate['available_troops'])
     return gamestate
 
+    
 class Player(models.Model):
   username = models.CharField(max_length=50)
   key = models.CharField(max_length=50)
   num = models.IntegerField(default=0)
   game = models.ForeignKey(Game, on_delete=models.CASCADE)
+  ready = models.BooleanField(default=False)
 
 class TroopCounter(models.Model):
   max_available = models.IntegerField(default=0)
@@ -206,7 +242,8 @@ class TroopCounter(models.Model):
 class Territory(models.Model):
   i = models.IntegerField(default=0)
   j = models.IntegerField(default=0)
-  owner = models.ForeignKey(Player, on_delete=models.CASCADE)
+  owner = models.ForeignKey(Player, on_delete=models.CASCADE, null=True)
+  terrain = models.IntegerField(default=0)
   game = models.ForeignKey(Game, on_delete=models.CASCADE)
 
 class Border(models.Model):
@@ -217,6 +254,10 @@ class Border(models.Model):
   defend = models.IntegerField(default=0)
 
 
+  def baseAttackStrength(self):
+    return 0
+  def baseDefendStrength(self):
+    return 0
   def attackStrength(self):
     return self.attack
   def defendStrength(self):
@@ -225,6 +266,8 @@ class Border(models.Model):
   def incTroopsIfPossible(self, attack):
     if self.t1.owner == self.t2.owner:
       return {INVALID_MESSAGE: 'tried to assign troops to internal border'}
+    if self.t2.owner == None:
+      return {INVALID_MESSAGE: 'tried to attack a desert'}
     tc = TroopCounter.objects.get(game=self.game,player=self.t1.owner,opponent=self.t2.owner)
     if ((attack == (self.defend == 0)) or ((not attack) == (self.attack == 0))) and tc.available == 0:
       return {INVALID_MESSAGE: 'tried to assign troops when none available'}
@@ -246,7 +289,5 @@ class Border(models.Model):
       tc.save()
       self.save()
  
-    print('returning assignmentUpdate')
-    print(tc.available)
-    return {'assignmentUpdate' : [self.t1.i, self.t1.j, self.t2.i, self.t2.j, self.attack, self.defend, self.attackStrength(), self.defendStrength()], 'troopUpdate': [[self.t2.owner.num, tc.available]]}
+    return {'assignments' : [[self.t1.i, self.t1.j, self.t2.i, self.t2.j, self.attack, self.defend, self.attackStrength(), self.defendStrength()]], 'troopUpdate': [[self.t2.owner.num, tc.available]]}
     

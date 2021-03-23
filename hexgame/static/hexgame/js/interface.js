@@ -46,7 +46,7 @@ PIXI.utils.sayHello(type)
 let app = new PIXI.Application({width: 256, height: 256});
 
 // the following are set by board.html:
-// player, player_ready, gamename
+// player, readies, gamename
 // territory_owners, visible_attacks
 // phase, turn, round, 
 // available_troops, available_horses, available_mines,
@@ -93,9 +93,6 @@ function setup() {
   }
   updateBorderVisibles(territory, hex_indices)
   updateReadyIndicators();
-
-  console.log('assignments')
-  console.log(assignments)
 
   for (let [i1,j1,i2,j2,attack,defend,as,ds] of assignments) {
     borders[i1][j1][i2-i1+1][j2-j1+1].update(attack,defend,as,ds)
@@ -182,8 +179,8 @@ function getDefendStrength(i1,j1,i2,j2) {
 
 
 function updateReadyIndicators() {
-  for (let i = 0; i < player_ready.length; i++) {
-    if (player_ready[i] === 0) {
+  for (let i = 0; i < readies.length; i++) {
+    if (!readies[i]) {
       readyIndicators[i].text = '...';
     } else {
       readyIndicators[i].text = 'R';
@@ -200,21 +197,26 @@ function packageGamestate() {
 
 function updateGamestate(gamestate) {
   
-  console.log('updateGamestate')
-
   if ('assignments' in gamestate) {
     for (let [i1,j1,i2,j2,attack,defend,as,ds] of gamestate['assignments']) {
       borders[i1][j1][i2-i1+1][j2-j1+1].update(attack,defend,as,ds)
     }
   }
-  if ('troopUpdate' in gamestate && rightDisplay.updateTroops !== undefined) {
-    console.log("in troopUpdate")
-    rightDisplay.updateTroops(gamestate['troopUpdate'])
+
+  if ('terrain' in gamestate) {
+    console.log(gamestate.terrain)
   }
 
-  if ('assignmentUpdate' in gamestate) {
-    let [i1,j1,i2,j2,attack,defend,as,ds] = gamestate['assignmentUpdate']
-    borders[i1][j1][i2-i1+1][j2-j1+1].update(attack,defend,as,ds)
+  // only receive this when can't see the assignments of opps,
+  // so can just set all attack and defend to 0 
+  if ('opponent_strengths' in gamestate) {
+    for (let [i1,j1,i2,j2,as,ds] of gamestate['opponent_strengths']) {
+      borders[i1][j1][i2-i1+1][j2-j1+1].update(0,0,as,ds)
+    }
+  }
+
+  if ('troopUpdate' in gamestate && rightDisplay.updateTroops !== undefined) {
+    rightDisplay.updateTroops(gamestate['troopUpdate'])
   }
 
   if ('usernames' in gamestate) {
@@ -231,10 +233,9 @@ function updateGamestate(gamestate) {
       updateBorderVisibles(territory, hex_indices)
     }
   if ('phase' in gamestate) {
-    console.log('in phase processing')
+    console.log('phase')
     console.log(phase)
     if (phase == -1) {
-      console.log('calling makeRightDisplay')
       rightDisplay.startGame()
     }
     if (phase >= 0 && rightDisplay.troopList === undefined) {
@@ -243,8 +244,10 @@ function updateGamestate(gamestate) {
     phase = gamestate.phase; }
   if ('turn' in gamestate) {
     turn = gamestate.turn; }
-  if ('player_ready' in gamestate) {
-    player_ready = gamestate.player_ready; }
+  if ('readies' in gamestate) {
+    readies = gamestate.readies; 
+    updateReadyIndicators();
+  }
 }
 
 

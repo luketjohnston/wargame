@@ -39,7 +39,11 @@ function createHex(i,j) {
     hex.y = y;
     hex.owner = -1
     hex.setOwner = (owner) => {
-      hex.tint = PLAYER_COLORS[owner]
+      if (owner == -1) {
+        hex.tint = 0x000000
+      } else {
+        hex.tint = PLAYER_COLORS[owner]
+      }
       hex.owner = owner
     }
     territory[i][j] = hex

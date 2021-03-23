@@ -21,6 +21,11 @@ function onmessage(e) {
     updateReadyIndicators();
   } else if ('playerJoined' in message) {
     addPlayer(message['playerJoined']['username'], message['playerJoined']['num'])
+  } else if ('waitMessage' in message) {
+    for (let i = 0; i < readies.length; i++) {
+      readies[i] = true
+    }
+    updateReadyIndicators()
   } else {
     updateGamestate(message);
   }

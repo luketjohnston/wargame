@@ -121,6 +121,8 @@ function makeBorder(i1,j1,i2,j2) {
 
     border.attack_t = 0
     border.defend_t = 0
+    border.attack_s = 0
+    border.defend_s = 0
     border.update = (attack,defend,as,ds) => {
       border.attack_t = attack
       border.defend_t = defend
@@ -168,7 +170,6 @@ function unselectBorder() {
 }
 
 function updateTroopDisplay(border) {
-  console.log(border.attack_t)
   let cont = border.troopContainer
   cont.removeChildren()
   cont.x = border.x
@@ -176,9 +177,7 @@ function updateTroopDisplay(border) {
   let rec1 = new PIXI.Rectangle(0,0,200,200)
   let base = new PIXI.BaseTexture.from(tilesetURL)
   let sword_texture = new PIXI.Texture(base, rec1)
-  console.log(border.attack_t)
   for (let i = 0; i < border.attack_t; i++) {
-    console.log("IN FOR LOOP TROOPDISP")
     let sword = new PIXI.Sprite.from(sword_texture)
     sword.scale.set(0.1,0.1)
     if (border.attack_t > 1) {
@@ -195,7 +194,6 @@ function updateTroopDisplay(border) {
   let rec2 = new PIXI.Rectangle(0,200,200,200)
   let shield_texture = new PIXI.Texture(base, rec2)
   for (let i = 0; i < border.defend_t; i++) {
-    console.log("IN FOR LOOP TROOPDISP")
     let shield = new PIXI.Sprite.from(shield_texture)
     shield.scale.set(0.1,0.1)
     if (border.defend_t > 1) {
@@ -209,7 +207,6 @@ function updateTroopDisplay(border) {
     cont.addChild(shield)
   }
 
-  console.log(border.theta)
   cont.rotation = (border.theta + Math.PI / 2)
   
 }

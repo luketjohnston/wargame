@@ -11,7 +11,7 @@ class GameConsumer(WebsocketConsumer):
     self.session_key = self.scope['session'].session_key
     game = Game.objects.get(name=self.gamename)
     self.player = Player.objects.get(key=self.session_key, game=game)
-    self.room_group_name = self.gamename
+    self.room_group_name = str(Game.objects.get(name=self.gamename).id)
     
     async_to_sync(self.channel_layer.group_add)(
       self.room_group_name,
@@ -51,28 +51,28 @@ class GameConsumer(WebsocketConsumer):
       
 
     game.processReadyMessage(self.player, message)
-    print(game.player_ready)
 
     if game.allReady():
-      game.allReadyUpdate();
+      async_to_sync(self.channel_layer.group_send)(
+        self.room_group_name,
+        {
+          'type': 'waitMessage',
+        })
 
+      game.allReadyUpdate();
       async_to_sync(self.channel_layer.group_send)(
         self.room_group_name,
         {
           'type': 'nextPhase',
-        }
-      )
-    else:
-      # send player ready message
-      print("SENDING PLAYER READY MESSAGE")
-      print(self.player)
+        })
+
+    else: 
       async_to_sync(self.channel_layer.group_send)(
         self.room_group_name,
         {
           'type': 'playerReady',
           'playerNum': self.player.num,
-        }
-      )
+        })
 
 
   def nextPhase(self, event):
@@ -80,6 +80,9 @@ class GameConsumer(WebsocketConsumer):
     gamestate = game.getGamestate(self.player)
     print('IN NEXTPHASE, sending')
     print(json.dumps(gamestate))
+    # game just started, need to send terrain 
+    if game.phase == 0:
+      self.send(json.dumps({'terrain': game.getTerrain()}))
     self.send(text_data=json.dumps(gamestate))
 
   def playerReset(self, event):
@@ -89,12 +92,14 @@ class GameConsumer(WebsocketConsumer):
       self.send(text_data=json.dumps(gamestate))
     else:
       # for other players, just need to indicate this player isn't ready
-      self.send(json.dumps({'playerReadyMessage' : [int(game.player_ready[i] == '1') for i in range(game.numPlayers())]}))
+      self.send(json.dumps({'readies' : list(game.readies())}))
 
   def playerReady(self, event):
     game = Game.objects.get(name=self.gamename)
-    self.send(json.dumps({'playerReadyMessage' : [int(game.player_ready[i] == '1') for i in range(game.numPlayers())]}))
+    self.send(json.dumps({'readies' : list(game.readies())}))
   def playerJoined(self, event):
     game = Game.objects.get(name=self.gamename)
     self.send(json.dumps({'playerJoined' : {'username': event['username'], 'num': event['num']}}))
     
+  def waitMessage(self, event):
+    self.send(json.dumps({'waitMessage': 'Resolving combat, please wait...'}))

@@ -23,7 +23,7 @@
 
       <form action="{% url 'hexgame:joinGame' game.0  %}" method="post">
       {% csrf_token %}
-        <input type="text" value="Username" id="username" name="username">
+        <input required type="text" value="Username" id="username" name="username">
         <input type="submit" value="Join">
       </form>
 
@@ -34,7 +34,7 @@
     <form action="{% url 'hexgame:createGame' %}" method="post">
     {% csrf_token %}
       Create game named:
-      <input type="text" id="gamename" name="gamename">
+      <input required type="text" id="gamename" name="gamename">
       <input type="submit" value="Create">
     </form>
   </ul>

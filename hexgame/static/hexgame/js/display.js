@@ -139,7 +139,7 @@ function makeRightDisplay(app) {
       attacks.text = String(selectedBorder.attack_t)
       defends.text = String(selectedBorder.defend_t)
       attack_s.text = String(selectedBorder.attack_s)
-      defend_s.text = String(selectedBorder.defend_t)
+      defend_s.text = String(selectedBorder.defend_s)
     }
 
     disp.showBorder = function(i1,j1,i2,j2) {
@@ -162,13 +162,7 @@ function makeRightDisplay(app) {
       detailContainer.visible = true
     }
     disp.updateTroops = (updateList) => {
-      console.log(updateList)
       for (let [pi, t] of updateList) {
-        console.log('updateTroops')
-        console.log('pi')
-        console.log(pi)
-        console.log('t')
-        console.log(t)
         disp.troopList[pi].text = String(t)
       }
     }
