@@ -5,12 +5,14 @@ from django.db.models import F
 import json
 import random
 
-TERRAIN = ['desert', 'forest', 'hills', 'plains', 'mountain']
+TERRAIN = ['water', 'forest', 'hills', 'plains', 'mountain']
+TERRAIN_TO_NUM = {'water': 0, 'forest': 1, 'hills': 2, 'plains': 3, 'mountain': 4}
 INVALID_MESSAGE = 'invalid'
+DIDJ = ((0,1),(0,-1),(1,0),(-1,0),(1,1),(-1,-1))
 
 NUM_PHASES = 2
 NUM_TURNS = 10
-BOARD_EDGE_WIDTH = 6
+BOARD_EDGE_WIDTH = 3
 
 # bw = board edge width
 def getTerritoryIndices(bw):
@@ -68,8 +70,7 @@ class Game(models.Model):
     for (i,j),owner in owners:
       t1 = Territory.objects.get(i=i,j=j,game=self)
       # add borders
-      didj = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[-1,-1]]
-      for di,dj in didj:
+      for di,dj in DIDJ:
         t2 = Territory.objects.filter(i=i+di,j=j+dj,game=self)
         if t2:
           t2 = t2[0]
@@ -175,21 +176,22 @@ class Game(models.Model):
 
   def getAssignment(self, player):
     assignment = []
-    opponent_strengths = []
-    own_borders = Border.objects.filter(game=self, t1__owner=player)
-    all_borders = Border.objects.filter(game=self)
+    all_borders = Border.objects.filter(game=self).exclude(t1__owner=F('t2__owner'))
+    own_borders = all_borders.filter(t1__owner=player)
+    opp_borders = all_borders.exclude(t1__owner=player)
+    own_r = [b.getAssignment() for b in own_borders]
     if self.getPhase() == -1:
-      pass
+      return []
     elif self.getPhase() == 0:
-      assignment = own_borders
+      opp_r = [b.getPubAssignment() for b in opp_borders]
     elif self.getPhase() == 1:
-      assignment = all_borders
+      opp_r = [b.getAssignment() for b in opp_borders]
 
-    return [(a.t1.i, a.t1.j, a.t2.i, a.t2.j, a.attack, a.defend, a.attackStrength(), a.defendStrength()) for a in assignment]
+    return own_r + opp_r 
 
   def getOppStrengths(self, player):
     opp_borders = Border.objects.filter(game=self).exclude(t1__owner=player)
-    return [(b.t1.i, b.t1.j, b.t2.i, b.t2.j, b.baseAttackStrength(), b.baseDefendStrength()) for b in opp_borders]
+    return [b.getAssignment() for b in opp_borders]
 
   def getAvailableTroops(self, player):
     tc = TroopCounter.objects.filter(game=self, player=player)
@@ -203,7 +205,6 @@ class Game(models.Model):
     context = {
       'player' : player.num,
       'assignments' : self.getAssignment(player),
-      'opponent_strengths' : self.getOppStrengths(player),
       'usernames' : self.getUsernames(),
       'territory_owners' : self.getOwners(),
       'phase': self.getPhase(),
@@ -222,6 +223,7 @@ class Game(models.Model):
     gamestate['gamename'] = json.dumps(gamestate['gamename'])
     gamestate['assignments'] = json.dumps(gamestate['assignments'])
     gamestate['available_troops'] = json.dumps(gamestate['available_troops'])
+    gamestate['terrain'] = json.dumps(self.getTerrain())
     return gamestate
 
     
@@ -246,6 +248,15 @@ class Territory(models.Model):
   terrain = models.IntegerField(default=0)
   game = models.ForeignKey(Game, on_delete=models.CASCADE)
 
+  def isAdjacent(self, t):
+    my_didj = (self.i - t.i, self.j - t.j)
+    return my_didj in DIDJ
+
+  # returns territories adjacent to this one that are owned by the same player
+  def getOwnedSurrounding(self):
+    return Territory.objects.none().union(*[Territory.objects.filter(game=self.game, owner=self.owner, i=self.i+di, j=self.j+dj) for (di,dj) in DIDJ])
+    
+
 class Border(models.Model):
   game = models.ForeignKey(Game, on_delete=models.CASCADE)
   t1 = models.ForeignKey(Territory, on_delete=models.CASCADE, related_name='border_t1')
@@ -253,21 +264,105 @@ class Border(models.Model):
   attack = models.IntegerField(default=0)
   defend = models.IntegerField(default=0)
 
+  def getAssignment(self):
+    return [self.t1.i, self.t1.j, self.t2.i, self.t2.j, self.attack, self.defend, self.attackStrength(), self.defendStrength()]
+  def getPubAssignment(self):
+    return [self.t1.i, self.t1.j, self.t2.i, self.t2.j, 0, 0, self.baseAttackStrength(), self.baseDefendStrength()]
+
+  def getLeftBorder(self):
+    DIDJ_to_leftTile = {
+      (0,1): (-1,0), 
+      (1,1): (0,1), 
+      (1,0): (1,1),
+      (0,-1): (1,0),
+      (-1,-1): (0,-1),
+      (-1,0): (-1,-1)}
+
+    di,dj = self.t2.i - self.t1.i, self.t2.j - self.t1.j
+    ltdi,ltdj = DIDJ_to_leftTile[(di,dj)]
+    lti,ltj = self.t1.i + ltdi, self.t1.j + ltdj
+    leftTile = Territory.objects.filter(game=self.game,i=lti,j=ltj)
+    if not leftTile: 
+      return None
+    elif leftTile[0].owner == self.t1.owner:
+      return Border.objects.get(game=self.game, t1=leftTile[0], t2=self.t2)
+    else:
+      return Border.objects.get(game=self.game,t1=self.t1, t2=leftTile[0])
+
+  def getRightBorder(self):
+    DIDJ_to_rightTile = {
+      (-1,0): (0,1),
+      (0,1) : (1,1),
+      (1,1) : (1,0),
+      (1,0) : (0,-1),
+      (0,-1): (-1,-1),
+      (-1,-1): (-1,0)}
+    di,dj = self.t2.i - self.t1.i, self.t2.j - self.t1.j
+    rtdi,rtdj = DIDJ_to_rightTile[(di,dj)]
+    rti,rtj = self.t1.i + rtdi, self.t1.j + rtdj
+    rightTile = Territory.objects.filter(game=self.game,i=rti,j=rtj)
+    if not rightTile: 
+      return None
+    elif rightTile[0].owner == self.t1.owner:
+      return Border.objects.get(game=self.game, t1=rightTile[0], t2=self.t2)
+    else:
+      return Border.objects.get(game=self.game,t1=self.t1, t2=rightTile[0])
 
   def baseAttackStrength(self):
     return 0
   def baseDefendStrength(self):
-    return 0
+    lb = self.getLeftBorder()
+    rb = self.getRightBorder()
+    adjustment = 0
+    if self.t1.terrain == TERRAIN_TO_NUM['mountain'] or self.t1.terrain == TERRAIN_TO_NUM['forest']:
+      adjustment += 1
+    for t in self.t1.getOwnedSurrounding():
+      if t.terrain == TERRAIN_TO_NUM['forest']:
+        adjustment += 1; 
+        break
+    #if lb and (not lb.t1 == self.t1) and lb.t1.terrain == TERRAIN_TO_NUM['mountain']:
+    #  adjustment += 1
+    #if rb and (not rb.t1 == self.t1) and rb.t1.terrain == TERRAIN_TO_NUM['mountain']:
+    #  adjustment += 1
+    return adjustment
   def attackStrength(self):
-    return self.attack
+    if self.t2.terrain == TERRAIN_TO_NUM['water']: 
+      return 0
+    print("IN ATTACK STRENGTH")
+    adjustment = 0
+    if self.t1.terrain == TERRAIN_TO_NUM['hills']:
+      adjustment += self.defend
+
+    lb = self.getLeftBorder()
+    rb = self.getRightBorder()
+    if lb:
+      print('terrain: ' + str(TERRAIN[lb.t1.terrain]))
+      print('lb.t2.owner: ' + str(lb.t2.owner))
+      print('self.t2.owner: ' + str(self.t2.owner))
+    if lb and lb.t1.terrain == TERRAIN_TO_NUM['plains'] and lb.t2.owner == self.t2.owner:
+      print('in first if')
+      adjustment += lb.attack
+    if rb and rb.t1.terrain == TERRAIN_TO_NUM['plains'] and rb.t2.owner == self.t2.owner:
+      print('in second if')
+      adjustment += rb.attack
+    return self.attack + adjustment + self.baseAttackStrength()
   def defendStrength(self):
-    return self.defend
+    adjustment = 0
+    if self.t1.terrain == TERRAIN_TO_NUM['hills']:
+      adjustment += self.attack
+    [rb,lb] = [self.getRightBorder(), self.getLeftBorder()]
+    for b in [rb,lb]:
+      if b and b.t2.owner == self.t2.owner:
+        adjustment += b.defend
+    
+
+    return self.defend + adjustment + self.baseDefendStrength()
 
   def incTroopsIfPossible(self, attack):
     if self.t1.owner == self.t2.owner:
       return {INVALID_MESSAGE: 'tried to assign troops to internal border'}
     if self.t2.owner == None:
-      return {INVALID_MESSAGE: 'tried to attack a desert'}
+      return {INVALID_MESSAGE: 'tried to attack a body of water'}
     tc = TroopCounter.objects.get(game=self.game,player=self.t1.owner,opponent=self.t2.owner)
     if ((attack == (self.defend == 0)) or ((not attack) == (self.attack == 0))) and tc.available == 0:
       return {INVALID_MESSAGE: 'tried to assign troops when none available'}
@@ -289,5 +384,5 @@ class Border(models.Model):
       tc.save()
       self.save()
  
-    return {'assignments' : [[self.t1.i, self.t1.j, self.t2.i, self.t2.j, self.attack, self.defend, self.attackStrength(), self.defendStrength()]], 'troopUpdate': [[self.t2.owner.num, tc.available]]}
+    return {'assignments' : [b.getAssignment() for b in [self, self.getLeftBorder(), self.getRightBorder()] if b], 'troopUpdate': [[self.t2.owner.num, tc.available]]}
     

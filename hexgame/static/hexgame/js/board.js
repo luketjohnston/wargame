@@ -1,9 +1,13 @@
+import {sheet} from './interface.js'
 
 const BOARD_CONTAINER = new PIXI.Container()
-const BOARD_EDGE_WIDTH = 6
+const BOARD_EDGE_WIDTH = 3
 const TILE_WIDTH = 130;
 const BOARD_SPEED = 10
 const PLAYER_COLORS = [0x2B7255, 0x094788, 0x8C0101, 0x9EA006, 0xEBA834, 0x9E9E9E, 0xB11FD1]
+const LAKE_COLOR = 0x009EFF
+
+const TERRAIN_TEXTURES = ['plains_final.svg', 'forest_final.svg', 'hills_final.svg', 'plains_final.svg', 'mountains_final.svg']
 
 var territory = new Array(BOARD_EDGE_WIDTH * 2 - 1)
 for (let i = 0; i < territory.length; i++) {
@@ -47,7 +51,24 @@ function createHex(i,j) {
       hex.owner = owner
     }
     territory[i][j] = hex
+    hex.setTerrain = (t) => {
+      hex.terrain = t
+      console.log("set terrain")
+      console.log(t)
+      if (t == 0) {
+        hex.tint = LAKE_COLOR
+      } else {
+        let tex = sheet.textures[TERRAIN_TEXTURES[t]]
+        let s = PIXI.Sprite.from(tex)
+        s.scale.set(0.13,0.13)
+        s.x = hex.width / 2 - s.width / 2
+        s.y = hex.height/2 - s.height / 2
+        hex.addChild(s)
+      }
+    }
+      
     BOARD_CONTAINER.addChild(hex)
+   
 }
 
-export {BOARD_EDGE_WIDTH, TILE_WIDTH, BOARD_SPEED, BOARD_CONTAINER, territory, createHex, PLAYER_COLORS, getX, getY}
+export {LAKE_COLOR, BOARD_EDGE_WIDTH, TILE_WIDTH, BOARD_SPEED, BOARD_CONTAINER, territory, createHex, PLAYER_COLORS, getX, getY}

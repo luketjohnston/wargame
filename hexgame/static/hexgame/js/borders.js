@@ -148,6 +148,9 @@ function updateBorderVisibles(territory, hex_indices) {
       let b = borders[i][j][di+1][dj+1]
       let v = territory[i+di] === undefined || territory[i+di][j+dj] === undefined || territory[i+di][j+dj].owner != territory[i][j].owner
       b.visible = v
+      if (territory[i][j].terrain == 0) {
+        b.visible = false
+      }
     }
   }
 }
@@ -162,6 +165,16 @@ function makeAllBorders(hex_indices) {
     }
   }
 }
+
+function zeroAllBorders(hex_indices) {
+  let d_coords = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[-1,-1]]
+  for (let [i,j] of hex_indices) {
+    for (let [di,dj] of d_coords) {
+      borders[i][j][di+1][dj+1].update(0,0,0,0)
+    }
+  }
+}
+  
   
 
 function unselectBorder() {
@@ -175,33 +188,64 @@ function updateTroopDisplay(border) {
   cont.removeChildren()
   cont.x = border.x
   cont.y = border.y
-  for (let i = 0; i < border.attack_t; i++) {
-    let sword = new PIXI.Sprite.from(sheet.textures["sword1.png"])
-    sword.scale.set(0.1,0.1)
-    if (border.attack_t > 1) {
-      let minx = - TILE_WIDTH / 7  - sword.width / 2
-      let maxx =   TILE_WIDTH / 7  - sword.width / 2
-      sword.x = minx + i * (maxx  - minx) / (border.attack_t - 1)
-    } else {
-      sword.x = -sword.width / 2   
-    }
-    sword.y = - TILE_WIDTH / 2 + sword.height / 2
-    cont.addChild(sword)
+
+  let SHOW_STRENGTH = true
+  let SHOW_TROOP = true
+  var def_lim;
+  var att_lim;
+  var trp_lim;
+  if (SHOW_STRENGTH) {
+    def_lim = border.defend_s
+    att_lim = border.attack_s
+  } else {
+    def_lim = border.defend_t
+    att_lim = border.attack_t
+  }
+  if (SHOW_TROOP) {
+    trp_lim = border.attack_t + border.defend_t
+  } else {
+    trp_lim = 0
   }
 
-  for (let i = 0; i < border.defend_t; i++) {
-    let shield = new PIXI.Sprite.from(sheet.textures["shield1.png"])
-    shield.scale.set(0.1,0.1)
-    if (border.defend_t > 1) {
-      let minx = - TILE_WIDTH / 7  - shield.width / 2
-      let maxx =   TILE_WIDTH / 7  - shield.width / 2
-      shield.x = minx + i * (maxx  - minx) / (border.defend_t - 1)
-    } else {
-      shield.x = -shield.width / 2   
+  let ICON_XLIM = TILE_WIDTH / 7.6
+
+  let setIcons = (makeGraphic, lim, yshift) => {
+    for (let i = 0; i < lim; i++) {
+      let s = makeGraphic()
+      if (lim > 1) {
+        let minx = - ICON_XLIM  - s.width / 2
+        let maxx =   ICON_XLIM - s.width / 2
+        s.x = minx + i * (maxx  - minx) / (lim - 1)
+      } else {
+        s.x = -s.width / 2   
+      }
+      s.y = - TILE_WIDTH / 2 + s.height / 2 + yshift * (s.height)
+      cont.addChild(s)
     }
-    shield.y = - TILE_WIDTH / 2 + shield.height / 2
-    cont.addChild(shield)
   }
+
+  let makeSword = () => {
+    let s = PIXI.Sprite.from(sheet.textures["sword1.png"])
+    s.scale.set(0.1,0.1)
+    return s
+  }
+  let makeShield = () => {
+    let s = PIXI.Sprite.from(sheet.textures["shield1.png"])
+    s.scale.set(0.1,0.1)
+    return s
+  }
+  let makeTroop = () => {
+    let trp = new PIXI.Graphics()
+    trp.beginFill(0x000000)
+    let r = 8
+    trp.drawCircle(r,r,r)
+    trp.endFill()
+    return trp
+  }
+
+  setIcons(makeShield, def_lim, 0)
+  setIcons(makeTroop, trp_lim, 1)
+  setIcons(makeSword,  att_lim, -0.5)
 
   cont.rotation = (border.theta + Math.PI / 2)
   
@@ -209,5 +253,5 @@ function updateTroopDisplay(border) {
          
   
 
-export {borders, BORDER_CONT, selectedBorder, unselectBorder, updateBorderVisibles, makeAllBorders}
+export {borders, BORDER_CONT, selectedBorder, unselectBorder, updateBorderVisibles, makeAllBorders, zeroAllBorders}
 

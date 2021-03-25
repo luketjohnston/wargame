@@ -1,7 +1,7 @@
 // TODOS:
 // remap scroll event to move board
-import {BOARD_SPEED, PLAYER_COLORS, BOARD_EDGE_WIDTH, createHex, territory, BOARD_CONTAINER} from './board.js'
-import {makeAllBorders, updateBorderVisibles, unselectBorder, borders, BORDER_CONT, selectedBorder} from './borders.js'
+import {LAKE_COLOR, BOARD_SPEED, PLAYER_COLORS, BOARD_EDGE_WIDTH, createHex, territory, BOARD_CONTAINER} from './board.js'
+import {zeroAllBorders, makeAllBorders, updateBorderVisibles, unselectBorder, borders, BORDER_CONT, selectedBorder} from './borders.js'
 import {rightDisplay, makeRightDisplay} from './display.js'
 import {resetMessage, readyMessage, assignmentMessage} from './messaging.js'
 
@@ -68,6 +68,7 @@ function setup() {
   app.renderer.view.style.position = "absolute";
   app.renderer.view.style.display = "block";
   app.renderer.resize(window.innerWidth, window.innerHeight);
+  app.renderer.backgroundColor = LAKE_COLOR;
 
   // 'board edge width
   let bw = BOARD_EDGE_WIDTH
@@ -93,6 +94,12 @@ function setup() {
   for (let [i,j,owner] of territory_owners) {
     territory[i][j].setOwner(owner);
   }
+
+  for (let [i,j,t] of terrain) {
+    territory[i][j].setTerrain(t)
+  }
+
+
   updateBorderVisibles(territory, hex_indices)
   updateReadyIndicators();
 
@@ -198,6 +205,22 @@ function packageGamestate() {
 }  
 
 function updateGamestate(gamestate) {
+  if ('phase' in gamestate) {
+    console.log('phase')
+    console.log(phase)
+    if (phase == -1) {
+      rightDisplay.startGame()
+    }
+    if (phase >= 0 && rightDisplay.troopList === undefined) {
+      rightDisplay.startGame()
+    }
+    if (phase != gamestate.phase) {
+      // zero all border assignments  
+      zeroAllBorders(hex_indices)
+    }
+    
+    
+    phase = gamestate.phase; }
   
   if ('assignments' in gamestate) {
     for (let [i1,j1,i2,j2,attack,defend,as,ds] of gamestate['assignments']) {
@@ -206,16 +229,20 @@ function updateGamestate(gamestate) {
   }
 
   if ('terrain' in gamestate) {
-    console.log(gamestate.terrain)
-  }
-
-  // only receive this when can't see the assignments of opps,
-  // so can just set all attack and defend to 0 
-  if ('opponent_strengths' in gamestate) {
-    for (let [i1,j1,i2,j2,as,ds] of gamestate['opponent_strengths']) {
-      borders[i1][j1][i2-i1+1][j2-j1+1].update(0,0,as,ds)
+    for (let [i,j,t] of gamestate.terrain) {
+      territory[i][j].setTerrain(t)
+      updateBorderVisibles(territory, hex_indices)
     }
   }
+
+  // TODO remove
+  // only receive this when can't see the assignments of opps,
+  // so can just set all attack and defend to 0 
+  //if ('opponent_strengths' in gamestate) {
+  //  for (let [i1,j1,i2,j2,as,ds] of gamestate['opponent_strengths']) {
+  //    borders[i1][j1][i2-i1+1][j2-j1+1].update(0,0,as,ds)
+  //  }
+  //}
 
   if ('troopUpdate' in gamestate && rightDisplay.updateTroops !== undefined) {
     rightDisplay.updateTroops(gamestate['troopUpdate'])
@@ -234,16 +261,6 @@ function updateGamestate(gamestate) {
       territory[i][j].setOwner(owner);
       updateBorderVisibles(territory, hex_indices)
     }
-  if ('phase' in gamestate) {
-    console.log('phase')
-    console.log(phase)
-    if (phase == -1) {
-      rightDisplay.startGame()
-    }
-    if (phase >= 0 && rightDisplay.troopList === undefined) {
-      rightDisplay.startGame()
-    }
-    phase = gamestate.phase; }
   if ('turn' in gamestate) {
     turn = gamestate.turn; }
   if ('readies' in gamestate) {
