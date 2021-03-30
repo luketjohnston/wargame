@@ -212,9 +212,13 @@ function updateTroopDisplay(border) {
   let setIcons = (makeGraphic, lim, yshift) => {
     for (let i = 0; i < lim; i++) {
       let s = makeGraphic()
+        
       if (lim > 1) {
-        let minx = - ICON_XLIM  - s.width / 2
-        let maxx =   ICON_XLIM - s.width / 2
+        let minx = -s.width / 2 - (s.width / 3 * (lim - 1))
+        let maxx = -s.width / 2 + (s.width / 3 * (lim - 1))
+        minx = Math.max(-ICON_XLIM  -s.width / 2, minx)
+        maxx = Math.min(ICON_XLIM -s.width / 2, maxx)
+
         s.x = minx + i * (maxx  - minx) / (lim - 1)
       } else {
         s.x = -s.width / 2   
