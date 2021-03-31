@@ -25,7 +25,7 @@ SECRET_KEY = '+o_ytmz*^54=xsd2-i1nsfjp_bg_wiet*5i%8wu2o+3dhyyvaw'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
-DEBUG = True
+#DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
