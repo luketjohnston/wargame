@@ -134,9 +134,12 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATIC_URL = '/static/'
 
 # Extra places for collectstatic to find static files.
-STATICFILES_DIRS = (
-    os.path.join(BASE_DIR, 'static'),
-)
+# heroku guide it says to do this, but it causes it to break
+# see https://stackoverflow.com/questions/19323513/heroku-django-oserror-no-such-file-or-directory-app-myappname-static
+# to fix
+#STATICFILES_DIRS = (
+#    os.path.join(BASE_DIR, 'static'),
+#)
 
 ASGI_APPLICATION = "wargame.routing.application"
 
