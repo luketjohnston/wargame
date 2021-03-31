@@ -1,4 +1,4 @@
-import {BOARD_CONTAINER, BOARD_EDGE_WIDTH, TILE_WIDTH, territory, getX, getY } from './board.js'
+import {territory, BOARD_CONTAINER, TILE_WIDTH, getX, getY } from './board.js'
 import {rightDisplay} from './display.js'
 import {vecFromPolar} from './utils.js'
 import {sheet} from './interface.js'
@@ -11,17 +11,7 @@ const BORDER_WIDTH = 25
 var selectedBorder;
 
 
-var borders = new Array(BOARD_EDGE_WIDTH * 2 - 1);
-for (let i = 0; i < borders.length; i++) {
-  borders[i] = new Array(BOARD_EDGE_WIDTH * 2 - 1)
-  for (let j = 0; j < borders[i].length; j++) {
-    borders[i][j] = new Array(3)
-    for (let di = 0; di < 3; di ++) {
-      borders[i][j][di] = new Array(3)
-    }
-  }
-}
-
+var borders;
 
 function makeBorder(i1,j1,i2,j2) {
 
@@ -141,7 +131,7 @@ function makeBorder(i1,j1,i2,j2) {
     return border
 }
 
-function updateBorderVisibles(territory, hex_indices) {
+function updateBorderVisibles(hex_indices) {
   let d_coords = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[-1,-1]]
   for (let [i,j] of hex_indices) {
     for (let [di,dj] of d_coords) {
@@ -157,6 +147,17 @@ function updateBorderVisibles(territory, hex_indices) {
 
 
 function makeAllBorders(hex_indices) {
+  borders = new Array(BOARD_EDGE_WIDTH * 2 - 1);
+  for (let i = 0; i < borders.length; i++) {
+    borders[i] = new Array(BOARD_EDGE_WIDTH * 2 - 1)
+    for (let j = 0; j < borders[i].length; j++) {
+      borders[i][j] = new Array(3)
+      for (let di = 0; di < 3; di ++) {
+        borders[i][j][di] = new Array(3)
+      }
+    }
+  }
+
   let d_coords = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[-1,-1]]
   for (let [i,j] of hex_indices) {
     for (let [di,dj] of d_coords) {

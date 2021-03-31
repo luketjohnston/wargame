@@ -18,9 +18,10 @@
         var turn = {{ turn }};
         var readies = {{ readies }};
         var gamename = {{ gamename|safe }};
-        var available_troops = {{ available_troops }};
+        var available_troops = {{ troopUpdate }};
         var assignments = {{ assignments }};
         var terrain = {{ terrain }};
+        var BOARD_EDGE_WIDTH = {{ board_edge_width }};
         var spritesheetURL = "{% static 'hexgame/images/spritesheet.json'%}";
     </script>
     <script src="{% static 'hexgame/pixi/pixi.min.js'%}"> </script>

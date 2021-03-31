@@ -1,4 +1,4 @@
-import {addPlayer, packageGamestate, updateReadyIndicators, updateGamestate} from './interface.js'
+import {addPlayer, updateReadyIndicators, updateGamestate} from './interface.js'
 
 const protocol =  window.location.protocol === 'https:' ? 'wss' : 'ws' 
 
@@ -52,17 +52,21 @@ chatSocket.onmessage = onmessage
 chatSocket.onclose = onclose
 //chatSocket.onerror = onclose
 
-function resetMessage() {
-  chatSocket.send(JSON.stringify({'reset' : true}))
+function unreadyMessage() {
+  chatSocket.send(JSON.stringify({'unready' : true}))
+}
+
+function resetMessage(opponent) {
+  chatSocket.send(JSON.stringify({'reset' : opponent}))
 }
 
 function readyMessage() {
-  chatSocket.send(packageGamestate())
+  chatSocket.send(JSON.stringify({'playerReady':true}))
 }
 
 function assignmentMessage(i1,j1,i2,j2,attack) {
   chatSocket.send(JSON.stringify({'assignment': [i1,j1,i2,j2,attack]}))
 }
 
-export {resetMessage, readyMessage, assignmentMessage}
+export {resetMessage, readyMessage, assignmentMessage, unreadyMessage}
 

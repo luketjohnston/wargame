@@ -30,49 +30,50 @@ class GameConsumer(WebsocketConsumer):
   def receive(self, text_data):
     print('text_data')
     print(text_data)
-    message = json.loads(text_data)
-    game = Game.objects.get(name=self.gamename)
-    if 'reset' in message:
-      game.processResetMessage(self.player)
-      # send player reset message
-      async_to_sync(self.channel_layer.group_send)(
-        self.room_group_name,
-        {
-          'type': 'playerReset',
-          'playerNum': self.player.num,
-        }
-      )
-      return
-    if 'assignment' in message:
-      message = game.processAssignment(self.player, message)
-      s = json.dumps(message)
-      self.send(s)
-      return
+    # need to make sure the 'ready' value is correct
+    self.player.refresh_from_db()
+    try:
+      message = json.loads(text_data)
+      game = Game.objects.get(name=self.gamename)
+      if 'unready' in message:
+        game.unready(self.player)
+        # send player reset message
+        async_to_sync(self.channel_layer.group_send)(
+          self.room_group_name,
+          { 'type': 'readies', }
+        )
+      if 'reset' in message:
+        opp = Player.objects.get(game=game, num=message['reset'])
+        tc, assignment = game.reset(self.player, opp)
+        message = {}
+        message['assignments'] = assignment
+        message['troopUpdate'] = [[tc.opponent.num, tc.available]]
+        self.send(json.dumps(message))
+      if 'assignment' in message:
+        message = game.processAssignment(self.player, message)
+        s = json.dumps(message)
+        self.send(s)
+      if 'playerReady' in message:
+        game.playerReady(self.player)
+        if game.allReady():
+          async_to_sync(self.channel_layer.group_send)(
+            self.room_group_name,
+            { 'type': 'waitMessage', })
+
+          game.allReadyUpdate();
+          async_to_sync(self.channel_layer.group_send)(
+            self.room_group_name,
+            { 'type': 'nextPhase', })
+
+        else: 
+          async_to_sync(self.channel_layer.group_send)(
+            self.room_group_name,
+            { 'type': 'readies', })
+    except InvalidRequest as e:
+      message = {}
+      message['invalid'] = str(e)
+      self.send(json.dumps(message))
       
-
-    game.processReadyMessage(self.player, message)
-
-    if game.allReady():
-      async_to_sync(self.channel_layer.group_send)(
-        self.room_group_name,
-        {
-          'type': 'waitMessage',
-        })
-
-      game.allReadyUpdate();
-      async_to_sync(self.channel_layer.group_send)(
-        self.room_group_name,
-        {
-          'type': 'nextPhase',
-        })
-
-    else: 
-      async_to_sync(self.channel_layer.group_send)(
-        self.room_group_name,
-        {
-          'type': 'playerReady',
-          'playerNum': self.player.num,
-        })
 
 
   def nextPhase(self, event):
@@ -82,19 +83,10 @@ class GameConsumer(WebsocketConsumer):
     print(json.dumps(gamestate))
     # game just started, need to send terrain 
     if game.phase == 0:
-      self.send(json.dumps({'terrain': game.getTerrain()}))
+      self.send(json.dumps({'phase' : 0, 'board_edge_width' : game.boardEdgeWidth(), 'terrain': game.getTerrain()}))
     self.send(text_data=json.dumps(gamestate))
 
-  def playerReset(self, event):
-    game = Game.objects.get(name=self.gamename)
-    if event['player'] == self.player.num:
-      gamestate = game.getGamestate(self.player)
-      self.send(text_data=json.dumps(gamestate))
-    else:
-      # for other players, just need to indicate this player isn't ready
-      self.send(json.dumps({'readies' : list(game.readies())}))
-
-  def playerReady(self, event):
+  def readies(self, event):
     game = Game.objects.get(name=self.gamename)
     self.send(json.dumps({'readies' : list(game.readies())}))
   def playerJoined(self, event):

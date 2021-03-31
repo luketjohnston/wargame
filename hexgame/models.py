@@ -5,14 +5,17 @@ from django.db.models import F
 import json
 import random
 
+START_TILES_PER_PLAYER = 7
 TERRAIN = ['water', 'forest', 'hills', 'plains', 'mountain']
 TERRAIN_TO_NUM = {'water': 0, 'forest': 1, 'hills': 2, 'plains': 3, 'mountain': 4}
-INVALID_MESSAGE = 'invalid'
 DIDJ = ((0,1),(0,-1),(1,0),(-1,0),(1,1),(-1,-1))
 
 NUM_PHASES = 2
 NUM_TURNS = 10
 BOARD_EDGE_WIDTH = 3
+
+class InvalidRequest(Exception):
+  pass
 
 # bw = board edge width
 def getTerritoryIndices(bw):
@@ -21,9 +24,6 @@ def getTerritoryIndices(bw):
     for j in range(max(i-bw+1, 0), min(bw+i, 2*bw-1)):
       indices.append((i,j))
   return indices
-  
-
-  
 
 class Game(models.Model):
   # TODO how many phases?
@@ -42,8 +42,17 @@ class Game(models.Model):
 
     return game
 
+  def boardEdgeWidth(self):
+    bew = 1
+    np = self.numPlayers()
+    def total_tiles(bew):
+      return 3 * (bew - 1) * bew + 1
+    while total_tiles(bew) < START_TILES_PER_PLAYER * np:
+      bew += 1
+    return bew
+
   def createBalancedStart(self):
-    territories = getTerritoryIndices(BOARD_EDGE_WIDTH)
+    territories = getTerritoryIndices(self.boardEdgeWidth())
     starting_num = len(territories) // self.numPlayers()
     players = list(range(self.numPlayers())) * starting_num
     players += [-1] * (len(territories) - len(players))
@@ -94,22 +103,27 @@ class Game(models.Model):
     player.ready=True
     player.save()
 
-  def processReadyMessage(self, player, message):
-    print('in process ready message')
-    self.playerReady(player)
+  def unready(self, player):
+    player.ready = False
+    player.save()
 
   def processAssignment(self, player, message):
+    print('in process assignment')
+    print(player)
+    print(player.ready)
+    if player.ready:
+      print('in if')
+      print(player)
+      print(player.ready)
+      raise InvalidRequest('cannot assign troops when in ready state')
+    
     [i1,j1,i2,j2,attack] = message['assignment']
     b = Border.objects.filter(t1__i=i1,t1__j=j1,t2__i=i2,t2__j=j2,game=self,t1__owner=player)
     if b:
       return b[0].incTroopsIfPossible(attack)
     else:
-      return {INVALID_MESSAGE: ''}
+      raise InvalidRequest('Tried to assign troops to border that does not exist')
 
-  # updates gamestate to indicate player is not ready for next phase
-  def playerNotReady(self, player):
-    player.ready = False
-    player.save()
 
   def allReady(self):
     return all(Player.objects.filter(game=self).values_list('ready', flat=True))
@@ -159,6 +173,7 @@ class Game(models.Model):
     return Territory.objects.filter(game=self)
 
   def playerIsReady(self, player):
+    assert player.game == self
     return player.ready
 
   def getPhase(self):
@@ -174,6 +189,9 @@ class Game(models.Model):
   def getUsernames(self):
     return list(Player.objects.filter(game=self).values_list('username',flat=True))
 
+    
+
+
   def getAssignment(self, player):
     assignment = []
     all_borders = Border.objects.filter(game=self).exclude(t1__owner=F('t2__owner'))
@@ -186,16 +204,32 @@ class Game(models.Model):
       opp_r = [b.getPubAssignment() for b in opp_borders]
     elif self.getPhase() == 1:
       opp_r = [b.getAssignment() for b in opp_borders]
-
     return own_r + opp_r 
 
-  def getOppStrengths(self, player):
-    opp_borders = Border.objects.filter(game=self).exclude(t1__owner=player)
-    return [b.getAssignment() for b in opp_borders]
+  def getAssignmentOneOpp(self, player, opp):
+    assignment = []
+    borders = Border.objects.filter(game=self, t1__owner=player, t2__owner=opp)
+    return [b.getAssignment() for b in borders]
 
   def getAvailableTroops(self, player):
     tc = TroopCounter.objects.filter(game=self, player=player)
     return list(tc.values_list('opponent__num', 'available'))
+
+  ''' resets the 'player's troops that are assigned to borders with 'opp'.
+      returns the reset troop counters and assignments. '''
+  def reset(self, player, opp):
+    if (not self.getPhase()  == 0):
+      raise InvalidRequest('Cannot reset after the assignment phase')
+    if (player.ready):
+      raise InvalidRequest('You need to unready before resetting')
+      
+    tc = TroopCounter.objects.get(game=self, player=player, opponent=opp)
+    tc.available = tc.max_available
+    tc.save()
+    borders = Border.objects.filter(game=self, t1__owner=player, t2__owner=opp)
+    borders.update(attack=0)
+    borders.update(defend=0)
+    return (tc, self.getAssignmentOneOpp(player, opp))
 
   def getTerrain(self):
     return list(Territory.objects.filter(game=self).values_list('i', 'j', 'terrain'))
@@ -211,18 +245,19 @@ class Game(models.Model):
       'turn': self.getTurn(),
       'readies': self.readies(),
       'gamename': self.name,
-      'available_troops': self.getAvailableTroops(player),
+      'troopUpdate': self.getAvailableTroops(player),
     }
     return context
 
   def getGamestateContext(self, player):
     gamestate = self.getGamestate(player)
+    gamestate['board_edge_width'] = self.boardEdgeWidth()
     gamestate['usernames'] = json.dumps(gamestate['usernames'])
     gamestate['readies'] = json.dumps(gamestate['readies'])
     gamestate['territory_owners'] = json.dumps(gamestate['territory_owners'])
     gamestate['gamename'] = json.dumps(gamestate['gamename'])
     gamestate['assignments'] = json.dumps(gamestate['assignments'])
-    gamestate['available_troops'] = json.dumps(gamestate['available_troops'])
+    gamestate['troopUpdate'] = json.dumps(gamestate['troopUpdate'])
     gamestate['terrain'] = json.dumps(self.getTerrain())
     return gamestate
 
@@ -311,15 +346,22 @@ class Border(models.Model):
   def baseAttackStrength(self):
     return 0
   def baseDefendStrength(self):
+    if self.t2.owner == None:
+      return 0
+
     lb = self.getLeftBorder()
     rb = self.getRightBorder()
     adjustment = 0
-    if self.t1.terrain == TERRAIN_TO_NUM['mountain'] or self.t1.terrain == TERRAIN_TO_NUM['forest']:
+    
+    if self.t1.terrain == TERRAIN_TO_NUM['mountain']: 
       adjustment += 1
-    for t in self.t1.getOwnedSurrounding():
-      if t.terrain == TERRAIN_TO_NUM['forest']:
-        adjustment += 1; 
-        break
+    if self.t1.terrain == TERRAIN_TO_NUM['forest']:
+      adjustment += 1
+    else:
+      for t in self.t1.getOwnedSurrounding():
+        if t.terrain == TERRAIN_TO_NUM['forest']:
+          adjustment += 1; 
+          break
     #if lb and (not lb.t1 == self.t1) and lb.t1.terrain == TERRAIN_TO_NUM['mountain']:
     #  adjustment += 1
     #if rb and (not rb.t1 == self.t1) and rb.t1.terrain == TERRAIN_TO_NUM['mountain']:
@@ -335,15 +377,9 @@ class Border(models.Model):
 
     lb = self.getLeftBorder()
     rb = self.getRightBorder()
-    if lb:
-      print('terrain: ' + str(TERRAIN[lb.t1.terrain]))
-      print('lb.t2.owner: ' + str(lb.t2.owner))
-      print('self.t2.owner: ' + str(self.t2.owner))
     if lb and lb.t1.terrain == TERRAIN_TO_NUM['plains'] and lb.t2.owner == self.t2.owner:
-      print('in first if')
       adjustment += lb.attack
     if rb and rb.t1.terrain == TERRAIN_TO_NUM['plains'] and rb.t2.owner == self.t2.owner:
-      print('in second if')
       adjustment += rb.attack
     return self.attack + adjustment + self.baseAttackStrength()
   def defendStrength(self):
@@ -360,12 +396,12 @@ class Border(models.Model):
 
   def incTroopsIfPossible(self, attack):
     if self.t1.owner == self.t2.owner:
-      return {INVALID_MESSAGE: 'tried to assign troops to internal border'}
+      raise InvalidRequest('tried to assign troops to internal border')
     if self.t2.owner == None:
-      return {INVALID_MESSAGE: 'tried to attack a body of water'}
+      raise InvalidRequest('tried to attack a body of water')
     tc = TroopCounter.objects.get(game=self.game,player=self.t1.owner,opponent=self.t2.owner)
     if ((attack == (self.defend == 0)) or ((not attack) == (self.attack == 0))) and tc.available == 0:
-      return {INVALID_MESSAGE: 'tried to assign troops when none available'}
+      raise InvalidRequest('tried to assign troops when none available')
     else:
       owner = self.t1.owner
       available = tc.available

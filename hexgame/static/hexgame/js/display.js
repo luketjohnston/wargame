@@ -1,6 +1,6 @@
 import {PLAYER_COLORS} from './board.js'
 import {} from './interface.js'
-import {readyMessage} from './messaging.js'
+import {resetMessage, readyMessage, unreadyMessage} from './messaging.js'
 import {selectedBorder} from './borders.js'
 
 const TEXT_STYLE = new PIXI.TextStyle({
@@ -28,6 +28,7 @@ function makeRightDisplay(app) {
 
 
   let readyButton = makeReadyButton()
+  disp.readyButton = readyButton
   disp.addChild(readyButton)
 
   disp.updateSize = () => {
@@ -63,32 +64,63 @@ function makeRightDisplay(app) {
  
     disp.troopList = []
 
+    let tw = 35 // troop display square width
+    let xmargin = 20
+    let xspacing = tw + xmargin
+    if (usernames.length > 2) {
+      xspacing = Math.min((DISP_WIDTH - 2 * xmargin - tw) / (usernames.length - 2), xspacing)
+    }
+    
+
+    let squarecount = -1
     for (let i = 0; i < usernames.length; i++) {
       if (i == PLAYER) {
         disp.troopList.push(0)
       } else {
+        squarecount += 1
         let r = new PIXI.Graphics();
         r.beginFill(PLAYER_COLORS[i]);
-        r.drawRect(20,yoffset - margin,35,35)
+        r.drawRect(0,yoffset - tw,tw,tw)
+        r.x = xmargin + xspacing * squarecount
         r.endFill();
-        let indicator = new PIXI.Text('p' + String(i + 1));
-        indicator.x = 24;
-        indicator.y = yoffset + 4 - margin;
 
         let count = new PIXI.Text('');
-        count.style = TEXT_STYLE
-        count.x = 90;
-        count.y = yoffset + 4 - margin;
+        r.addChild(count)
+        Object.assign(count.style, TEXT_STYLE)
+        count.style.dropShadow = false;
+        count.x = 0 + 6;
+        count.y = yoffset - tw + 4;
+
         disp.addChild(r)
-        disp.addChild(indicator)
-        disp.addChild(count)
-        yoffset += 60
 
         disp.troopList.push(count)
-        disp.addChild(r)
-        disp.addChild(indicator)
+        count.count = 0
+
+        let mouseover = () => {
+          count.text = 'R'
+        }
+        let mouseout = () => {
+          count.text = String(count.count)
+        }
+        let resetClick = () => {
+          resetMessage(i)
+        }
+          
+          
+
+        r.interactive = true;
+        r.buttonMode = true;
+        r
+            .on('mouseover', mouseover)
+            .on('mouseout', mouseout)
+            .on('mouseup', resetClick)
+            .on('touchend', resetClick)
+            .on('mouseupoutside', resetClick)
+            .on('touchendoutside', resetClick)
+        
       }
     }
+    yoffset += 40
 
     let brk = new PIXI.Graphics();
     brk.beginFill(0xFFFFFF)
@@ -164,6 +196,7 @@ function makeRightDisplay(app) {
     disp.updateTroops = (updateList) => {
       for (let [pi, t] of updateList) {
         disp.troopList[pi].text = String(t)
+        disp.troopList[pi].count = t
       }
     }
   }
@@ -178,28 +211,66 @@ function makeReadyButton() {
   let group = new PIXI.Container();
 
   let ready = new PIXI.Graphics();
-  ready.beginFill(0xFFFFFF);
-  ready.drawRect(0,0,200, 40)
-  ready.endFill();
+  ready.lineStyle(4,0xFFFFFF,1)
+  //ready.beginFill(0x111111);
+  ready.drawRect(0,0,150, 40)
+  //ready.endFill();
+
   let text = new PIXI.Text("Ready");
-  text.x = 0; text.y = 0;
-  text.width = 200; text.height = 35;
+  Object.assign(text.style, TEXT_STYLE)
+  text.x = ready.width / 2 - text.width / 2; 
+  text.y = ready.height / 2 - text.height / 2;
+
+  let unreadyText = new PIXI.Text("Unready?")
+  Object.assign(unreadyText.style, TEXT_STYLE)
+  unreadyText.x = ready.width / 2 - unreadyText.width / 2; 
+  unreadyText.y = ready.height / 2 - unreadyText.height / 2;
+  unreadyText.visible = false
   
-  group.addChild(ready); group.addChild(text);
+  group.addChild(ready); group.addChild(text); group.addChild(unreadyText);
   group.text = text;
 
   group.interactive = true;
   group.buttonMode = true;
 
+  let mouseover = function() {
+    if (!readies[PLAYER]) {
+      ready.tint = PLAYER_COLORS[PLAYER]
+      text.tint = PLAYER_COLORS[PLAYER]
+    } else {
+      unreadyText.visible = true;
+      text.visible = false;
+    }
+  }
+  let mouseout = function() {
+    if (!readies[PLAYER]) {
+      ready.tint = 0xFFFFFF
+      text.tint = 0xFFFFFF
+    } 
+    unreadyText.visible = false;
+    text.visible = true;
+  }
+
   group
+      .on('mouseover', mouseover)
+      .on('mouseout', mouseout)
       .on('mouseup', readyClick)
-      .on('touchend', readyClick);
+      .on('touchend', readyClick)
+      .on('mouseupoutside', readyClick)
+      .on('touchendoutside', readyClick)
+    
 
   return group
 }
 
+
+
 function readyClick() {
-  readyMessage();
+  if (!readies[PLAYER]) {
+    readyMessage();
+  } else {
+    unreadyMessage();
+  }
 }
 
 export {rightDisplay, makeRightDisplay}
