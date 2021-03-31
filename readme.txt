@@ -1,3 +1,10 @@
+To get heroku working:
+need to makemigrations and migrate locally, then commit migration files with git
+heroku works by just pushing to the heroku app from git, you can learn it again pretty fast
+need to add redis app
+
+
+
 need to start redis to handle websocket messages
 redis-server
 
