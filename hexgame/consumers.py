@@ -25,9 +25,6 @@ class GameConsumer(WebsocketConsumer):
 
     self.session_key = self.scope['session'].session_key
     try:
-      print(self.session_key)
-      print(self.game)
-      print(self.game.keys)
       self.player = self.game.getPlayer(self.session_key)
     except InvalidRequest as e:
       self.send(json.dumps({'invalid': 'you havent joined this game'}))
@@ -61,6 +58,15 @@ class GameConsumer(WebsocketConsumer):
       gamestate['terrain'] = self.game.getAllTerrain()
 
     self.send(text_data=json.dumps(gamestate))
+    
+    # request readies from the controller
+    async_to_sync(self.channel_layer.group_send)(
+      self.controller_group,
+      {'type': 'processMessage',
+       'requestReadies': None,
+       'player':self.player}
+      )
+
 
 
   def playerGroup(self, i):
@@ -104,7 +110,8 @@ class GameConsumer(WebsocketConsumer):
   def processMessage(self, event):
     assert self.isController()
 
-    message = json.loads(event['text_data'])
+    if 'text_data' in event:
+      message = json.loads(event['text_data'])
     player = event['player']
     game = self.game
     response = {}
@@ -112,7 +119,9 @@ class GameConsumer(WebsocketConsumer):
     response_group = self.playerGroup(player)
 
     try:
-      if 'unready' in message:
+      if 'requestReadies' in event:
+        response['readies'] = game.readies
+      elif 'unready' in message:
         game.unreadyPlayer(player)
         # send player reset message
         response_group = self.gameGroup()
