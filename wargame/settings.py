@@ -24,8 +24,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = '+o_ytmz*^54=xsd2-i1nsfjp_bg_wiet*5i%8wu2o+3dhyyvaw'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
-#DEBUG = True
+#DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
@@ -132,6 +132,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # https://docs.djangoproject.com/en/1.9/howto/static-files/
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATIC_URL = '/static/'
+
+GAMEFILES_DIR = os.path.join(BASE_DIR, 'gamefiles')
 
 # Extra places for collectstatic to find static files.
 # heroku guide it says to do this, but it causes it to break

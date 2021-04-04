@@ -1,5 +1,5 @@
 import {PLAYER_COLORS} from './board.js'
-import {} from './interface.js'
+import {numPlayers, PLAYER, isReady, phase} from './interface.js'
 import {resetMessage, readyMessage, unreadyMessage} from './messaging.js'
 import {selectedBorder} from './borders.js'
 
@@ -26,7 +26,6 @@ function makeRightDisplay(app) {
   disp.addChild(background)
   app.stage.addChild(disp)
 
-
   let readyButton = makeReadyButton()
   disp.readyButton = readyButton
   disp.addChild(readyButton)
@@ -52,8 +51,11 @@ function makeRightDisplay(app) {
   startMessage.y = yoffset
   startMessage.style = {fill: 0xFFFFFF, font: "16px PetMe64"}
   disp.addChild(startMessage)
+  disp.started = false
 
   disp.startGame = () => {
+    disp.started = true
+    console.log("IN DISP STARTGAME")
     startMessage.visible = false
     let t1 = new PIXI.Text('Available troops:')
     t1.x = 20
@@ -67,13 +69,13 @@ function makeRightDisplay(app) {
     let tw = 35 // troop display square width
     let xmargin = 20
     let xspacing = tw + xmargin
-    if (usernames.length > 2) {
-      xspacing = Math.min((DISP_WIDTH - 2 * xmargin - tw) / (usernames.length - 2), xspacing)
+    if (numPlayers() > 2) {
+      xspacing = Math.min((DISP_WIDTH - 2 * xmargin - tw) / (numPlayers() - 2), xspacing)
     }
     
 
     let squarecount = -1
-    for (let i = 0; i < usernames.length; i++) {
+    for (let i = 0; i < numPlayers(); i++) {
       if (i == PLAYER) {
         disp.troopList.push(0)
       } else {
@@ -189,11 +191,16 @@ function makeRightDisplay(app) {
       selectMessage.visible = true
       detailContainer.visible = false
     }
+    console.log('making show border info')
     disp.showBorderInfo = function() {
       selectMessage.visible = false
       detailContainer.visible = true
     }
+    console.log(disp.showBorderInfo)
     disp.updateTroops = (updateList) => {
+      console.log("IN UPDATETROOPS")
+      console.log(disp.troopList)
+      console.log(updateList)
       for (let [pi, t] of updateList) {
         disp.troopList[pi].text = String(t)
         disp.troopList[pi].count = t
@@ -234,7 +241,7 @@ function makeReadyButton() {
   group.buttonMode = true;
 
   let mouseover = function() {
-    if (!readies[PLAYER]) {
+    if (!isReady(PLAYER)) {
       ready.tint = PLAYER_COLORS[PLAYER]
       text.tint = PLAYER_COLORS[PLAYER]
     } else {
@@ -243,7 +250,7 @@ function makeReadyButton() {
     }
   }
   let mouseout = function() {
-    if (!readies[PLAYER]) {
+    if (!isReady(PLAYER)) {
       ready.tint = 0xFFFFFF
       text.tint = 0xFFFFFF
     } 
@@ -266,7 +273,7 @@ function makeReadyButton() {
 
 
 function readyClick() {
-  if (!readies[PLAYER]) {
+  if (!isReady(PLAYER)) {
     readyMessage();
   } else {
     unreadyMessage();

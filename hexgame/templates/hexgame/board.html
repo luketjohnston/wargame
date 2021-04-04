@@ -10,19 +10,8 @@
     <meta charset="utf-8">
     <title>Wargame</title>
     <script type="text/javascript">
-        <!-- TODO automate this -->
-        const PLAYER = {{ player }};
-        var territory_owners = {{ territory_owners }};
-        var usernames = {{ usernames|safe }};
-        var phase = {{ phase }};
-        var turn = {{ turn }};
-        var readies = {{ readies }};
-        var gamename = {{ gamename|safe }};
-        var available_troops = {{ troopUpdate }};
-        var assignments = {{ assignments }};
-        var terrain = {{ terrain }};
-        var BOARD_EDGE_WIDTH = {{ board_edge_width }};
-        var spritesheetURL = "{% static 'hexgame/images/spritesheet.json'%}";
+        const SPRITESHEET_URL = "{% static 'hexgame/images/spritesheet.json'%}";
+        const GAMENAME = "{{gamename|safe}}"
     </script>
     <script src="{% static 'hexgame/pixi/pixi.min.js'%}"> </script>
 

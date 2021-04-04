@@ -3,6 +3,12 @@ need to makemigrations and migrate locally, then commit migration files with git
 heroku works by just pushing to the heroku app from git, you can learn it again pretty fast
 need to add redis app
 
+if the server hands while writing a file (appears as server 500 error with  no message),
+it might be because it's writing to a directory that doesn't exist.
+
+pip installed:
+jsonpickle
+
 
 
 need to start redis to handle websocket messages

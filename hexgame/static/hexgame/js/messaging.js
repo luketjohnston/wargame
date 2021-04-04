@@ -2,30 +2,19 @@ import {addPlayer, updateReadyIndicators, updateGamestate} from './interface.js'
 
 const protocol =  window.location.protocol === 'https:' ? 'wss' : 'ws' 
 
+var chatSocket;
 
-var chatSocket = new WebSocket(
-  // TODO roomname
-   protocol + '://'
-   + window.location.host
-   + '/ws/hexgame/board/'
-   + gamename + '/'
-);
 
 function onmessage(e) {
   console.log("received message:")
   let message = JSON.parse(e.data);
   console.log(message)
   
-  if ('playerReadyMessage' in message) {
-    player_ready = message['playerReadyMessage']
-    updateReadyIndicators();
-  } else if ('playerJoined' in message) {
+  if ('playerJoined' in message) {
     addPlayer(message['playerJoined']['username'], message['playerJoined']['num'])
   } else if ('waitMessage' in message) {
-    for (let i = 0; i < readies.length; i++) {
-      readies[i] = true
-    }
-    updateReadyIndicators()
+    readies = [true] * usernames.length
+    updateReadyIndicators(readies)
   } else {
     updateGamestate(message);
   }
@@ -41,16 +30,26 @@ function onclose(e) {
   //     protocol + '://'
   //     + window.location.host
   //     + '/ws/board/'
-  //     + gamename + '/'
+  //     + GAMENAME + '/'
   //  );
   //  chatSocket.onmessage = onmessage;
   //  chatSocket.onclose = onclose;
   //  }, 10000);
 };
 
-chatSocket.onmessage = onmessage
-chatSocket.onclose = onclose
-//chatSocket.onerror = onclose
+function startSocket() {
+  chatSocket = new WebSocket(
+    // TODO roomname
+     protocol + '://'
+     + window.location.host
+     + '/ws/hexgame/board/'
+     + GAMENAME + '/'
+  );
+  chatSocket.onmessage = onmessage
+  chatSocket.onclose = onclose
+  //chatSocket.onerror = onclose
+}
+
 
 function unreadyMessage() {
   chatSocket.send(JSON.stringify({'unready' : true}))
@@ -68,5 +67,5 @@ function assignmentMessage(i1,j1,i2,j2,attack) {
   chatSocket.send(JSON.stringify({'assignment': [i1,j1,i2,j2,attack]}))
 }
 
-export {resetMessage, readyMessage, assignmentMessage, unreadyMessage}
+export {startSocket, resetMessage, readyMessage, assignmentMessage, unreadyMessage}
 

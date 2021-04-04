@@ -1,7 +1,7 @@
 import {territory, BOARD_CONTAINER, TILE_WIDTH, getX, getY } from './board.js'
 import {rightDisplay} from './display.js'
 import {vecFromPolar} from './utils.js'
-import {sheet} from './interface.js'
+import {PLAYER, BOARD_EDGE_WIDTH, sheet} from './interface.js'
 
 const BORDER_FILTER = new PIXI.filters.AlphaFilter();
 BORDER_FILTER.alpha = 0.1;
@@ -81,6 +81,8 @@ function makeBorder(i1,j1,i2,j2) {
       if (territory[i1][j1].owner == PLAYER) {
         selectedBorder = border
         selectedBorder.selection.visible = true
+        console.log(rightDisplay)
+        console.log(rightDisplay.showBorderInfo)
         rightDisplay.showBorderInfo()
         rightDisplay.updateText()
       }

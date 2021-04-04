@@ -1,4 +1,4 @@
-import {hex_indices, sheet} from './interface.js'
+import {BOARD_EDGE_WIDTH, hex_indices, sheet} from './interface.js'
 
 const BOARD_CONTAINER = new PIXI.Container()
 const TILE_WIDTH = 130;
@@ -64,9 +64,7 @@ function createHex(i,j) {
     territory[i][j] = hex
     hex.setTerrain = (t) => {
       hex.terrain = t
-      console.log("set terrain")
-      console.log(t)
-      if (t == 0) {
+      if (t == 0 || t === null) {
         hex.tint = LAKE_COLOR
       } else {
         let tex = sheet.textures[TERRAIN_TEXTURES[t]]
