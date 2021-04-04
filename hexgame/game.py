@@ -2,14 +2,13 @@ from collections import defaultdict, Counter
 import random
 
 
-MIN_START_TILES_PER_PLAYER = 7
+MIN_START_TILES_PER_PLAYER = 4
 TERRAIN = ['water', 'forest', 'hills', 'plains', 'mountain']
 TERRAIN_TO_NUM = {'water': 0, 'forest': 1, 'hills': 2, 'plains': 3, 'mountain': 4}
 DIDJ = ((0,1),(0,-1),(1,0),(-1,0),(1,1),(-1,-1))
 
 NUM_PHASES = 2
 NUM_TURNS = 10
-BOARD_EDGE_WIDTH = 3
 
 class InvalidRequest(Exception):
   pass
@@ -64,7 +63,19 @@ class GameOb:
     return len(self.usernames) - 1
 
   def maxTroops(self,p1,p2):
-    return 5
+    print('in max troops')
+    print(p1)
+    print(p2)
+    troops = 0
+    for b in self.allBorders():
+      (t1,t2) = ((b[0],b[1]),(b[2],b[3]))
+      if self.getOwner(t1) == p1 and self.getOwner(t2) == p2:
+        print('b, isvalid:')
+        print(b)
+        print(self.isValidBorder(b))
+        troops += 1
+    print(troops)
+    return troops
 
   def numPlayers(self):
     return len(self.usernames)
@@ -172,6 +183,8 @@ class GameOb:
 
   def getOwner(self, t):
     (i,j) = t
+    if (i < 0 or j < 0):
+      return None
     try:
       return self.owners[i][j]
     except IndexError:
@@ -212,6 +225,8 @@ class GameOb:
       v =  self.borders[i1][j1][i2-i1+1][j2-j1+1]
       if v and v > 0:
         return v
+      if self.getTerrainFromBorder(border) == 'hills' and v and v < 0:
+        return -1 * v
       return 0
     except IndexError:
       return 0
@@ -224,6 +239,9 @@ class GameOb:
       v = self.borders[i1][j1][i2-i1+1][j2-j1+1]
       if v and v < 0:
         return -1 * v
+      if self.getTerrainFromBorder(border) == 'hills' and v and v > 0:
+        return v
+        
       return 0
     except IndexError:
       return 0
@@ -422,23 +440,24 @@ class GameOb:
     t1,t2 = (i1,j1),(i2,j2)
     opp = self.getOwner(t2)
     is_defend = not is_attack
-    available = self.available[player][opp]
-    defend = self.getDefend(border)
-    attack = self.getAttack(border)
     if not player == self.getOwner(t1):
       raise InvalidRequest('tried to assign troops to unowned border')
     if self.isInternal(border):
       raise InvalidRequest('tried to assign troops to internal border')
-    if self.getOwner(t2) == None:
+    if opp == None:
       raise InvalidRequest('tried to attack a body of water')
     if not self.isValidBorder(border):
       raise InvalidRequest('tried to assign troops to invalid border')
+    available = self.available[player][opp]
+    defend = self.getDefend(border)
+    attack = self.getAttack(border)
 
     if ((is_attack == (self.getDefend(border) == 0)) or (is_defend == (self.getAttack(border) == 0))) and available == 0:
       raise InvalidRequest('tried to assign troops when none available')
     else:
         self.borders[i1][j1][i2-i1+1][j2-j1+1] += 2 * int(bool(is_attack)) - 1
-        if ((is_attack and defend > 0) or (is_defend and attack > 0)):
+        troopval = self.borders[i1][j1][i2-i1+1][j2-j1+1]
+        if ((is_attack and troopval <= 0) or (is_defend and troopval >= 0)):
           self.available[player][opp] += 1
         else:
           self.available[player][opp] -= 1
