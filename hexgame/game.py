@@ -365,8 +365,7 @@ class GameOb:
       for j in range(len(self.available[i])):
         self.available[i][j] = self.maxTroops(i,j)
     # zero all borders
-    for (i1,j1,i2,j2) in self.allBorders():
-      self.borders[i1][j1][i2-i1+1][j2-j1+1] = 0
+    self.borders = [[[[None for _ in range(3)] for _ in range(3)] for _ in range(2*self.bew-1)] for _ in range(2*self.bew-1)]
     
 
   def isInternal(self, border):
