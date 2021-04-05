@@ -10,6 +10,7 @@ var usernames = [];
 var phase = -1;
 var turn;
 var BOARD_EDGE_WIDTH;
+var phaseText;
 
 const INDIC_CONT = new PIXI.Container()
 
@@ -127,6 +128,7 @@ function updateGamestate(gamestate) {
       // zero all border assignments  
       zeroAllBorders(hex_indices)
       phase = gamestate.phase; 
+      phaseText.text = "Turn: " + String(gamestate.turn) + ", Phase: " + String(gamestate.phase)
     }
   }
   if ('territory_owners' in gamestate) {
@@ -196,14 +198,15 @@ ESC.press = unselectBorder
 function addPlayer(username, num) { 
     usernames.length = Math.max(num, usernames.length)
     usernames[num] = username
+    let starty = 140
     let r = new PIXI.Graphics();
     r.beginFill(PLAYER_COLORS[num]);
-    r.drawRect(20,100+60*num,35,35)
+    r.drawRect(20,starty+60*num,35,35)
     r.endFill();
 
     let indicator = new PIXI.Text('...');
     indicator.x = 24;
-    indicator.y = 104 + (60 * num);
+    indicator.y = starty + 4 + (60 * num);
     indicator.isready = false
     readyIndicators.push(indicator)
 
@@ -213,7 +216,7 @@ function addPlayer(username, num) {
     text.style.fontSize = "24px"
     text.style.dropShadowDistance = "2"
     text.x = 60;
-    text.y = 104 + (60 * num);
+    text.y = starty + 4 + (60 * num);
 
     INDIC_CONT.addChild(r)
     INDIC_CONT.addChild(indicator)
@@ -227,7 +230,16 @@ function createPlayerList() {
   gameText.style.fontSize = '46px'
   gameText.x = 20;
   gameText.y = 20;
+
+  phaseText = new PIXI.Text('Turn: 0, Phase: -1');
+  Object.assign(phaseText.style, TEXT_STYLE)
+  phaseText.x = 20;
+  phaseText.y = 100;
+   
+
+
   app.stage.addChild(gameText);
+  app.stage.addChild(phaseText);
 }
 
 function getAttackStrength(i1,j1,i2,j2) {

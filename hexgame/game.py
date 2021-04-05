@@ -138,6 +138,8 @@ class GameOb:
   def processAssignment(self, player, assignment):
     if self.isReady(player):
       raise InvalidRequest('cannot assign troops when in ready state')
+    if (not self.phase == 0):
+      raise InvalidRequest('tried to assign troops outside of troop assignment phase')
     
     [i1,j1,i2,j2,attack] = assignment
     b = (i1,j1,i2,j2)
@@ -444,7 +446,7 @@ class GameOb:
     if self.isInternal(border):
       raise InvalidRequest('tried to assign troops to internal border')
     if opp == None:
-      raise InvalidRequest('tried to attack a body of water')
+      raise InvalidRequest('tried to assign troops to a border with a body of water')
     if not self.isValidBorder(border):
       raise InvalidRequest('tried to assign troops to invalid border')
     available = self.available[player][opp]
