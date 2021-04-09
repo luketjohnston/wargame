@@ -312,6 +312,7 @@ class GameOb:
 
   def resolveAttacks(self):
 
+    updates = []
     for (i,j) in getTerritoryIndices(self.bew):
       attacks = [0 for _ in range(self.numPlayers())]
       for di,dj in DIDJ:
@@ -332,7 +333,9 @@ class GameOb:
         # if there is a tie in attacks, no change of ownership
         if Counter(attacks)[max(attacks)] > 1:
           continue
-        self.owners[i][j] = max(enumerate(attacks), key=lambda x: x[1])[0]
+        updates.append((i,j,max(enumerate(attacks), key=lambda x: x[1])[0]))
+    for i,j,o in updates:
+        self.owners[i][j] = o
     for i in range(len(self.available)):
       for j in range(len(self.available[i])):
         self.available[i][j] = self.maxTroops(i,j)
