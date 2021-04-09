@@ -2,7 +2,7 @@ from collections import defaultdict, Counter
 import random
 
 
-MIN_START_TILES_PER_PLAYER = 4
+MIN_START_TILES_PER_PLAYER = 5
 TERRAIN = ['water', 'forest', 'hills', 'plains', 'mountain']
 TERRAIN_TO_NUM = {'water': 0, 'forest': 1, 'hills': 2, 'plains': 3, 'mountain': 4}
 DIDJ = ((0,1),(0,-1),(1,0),(-1,0),(1,1),(-1,-1))
