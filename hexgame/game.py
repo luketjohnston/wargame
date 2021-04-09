@@ -63,18 +63,11 @@ class GameOb:
     return len(self.usernames) - 1
 
   def maxTroops(self,p1,p2):
-    print('in max troops')
-    print(p1)
-    print(p2)
     troops = 0
     for b in self.allBorders():
       (t1,t2) = ((b[0],b[1]),(b[2],b[3]))
       if self.getOwner(t1) == p1 and self.getOwner(t2) == p2:
-        print('b, isvalid:')
-        print(b)
-        print(self.isValidBorder(b))
         troops += 1
-    print(troops)
     return troops
 
   def numPlayers(self):
@@ -138,7 +131,7 @@ class GameOb:
   def processAssignment(self, player, assignment):
     if self.isReady(player):
       raise InvalidRequest('cannot assign troops when in ready state')
-    if (not self.phase == 0):
+    if (not self.getPhase() == 0):
       raise InvalidRequest('tried to assign troops outside of troop assignment phase')
     
     [i1,j1,i2,j2,attack] = assignment
@@ -227,8 +220,6 @@ class GameOb:
       v =  self.borders[i1][j1][i2-i1+1][j2-j1+1]
       if v and v > 0:
         return v
-      if self.getTerrainFromBorder(border) == 'hills' and v and v < 0:
-        return -1 * v
       return 0
     except IndexError:
       return 0
@@ -241,17 +232,12 @@ class GameOb:
       v = self.borders[i1][j1][i2-i1+1][j2-j1+1]
       if v and v < 0:
         return -1 * v
-      if self.getTerrainFromBorder(border) == 'hills' and v and v > 0:
-        return v
-        
       return 0
     except IndexError:
       return 0
 
   def getAttackStrength(self, border):
-    verbose = border == (2,2,2,3)
     if not self.isValidBorder(border):
-      if verbose: print('not valid')
       return 0
     (i1,j1,i2,j2) = border
     t1,t2 = (i1,j1),(i2,j2)
@@ -262,10 +248,7 @@ class GameOb:
     for b in blist:
       if self.getTerrainFromBorder(b) == 'plains':
         a += self.getAttack(b)
-    if verbose: print(a)
     a += self.getAttack(border)
-    if verbose: print(a)
-    if verbose: print('done')
     return a
 
   def getDefendStrength(self, border):
@@ -278,7 +261,9 @@ class GameOb:
     blist = [b for b in [rb,lb] if b]
     for b in blist:
       d += self.getDefend(b)
-    d += self.getDefend(border)
+      if self.getTerrainFromBorder(b) == 'hills':
+        d += self.getAttack(b)
+    d += self.getDefend(border) * 2
     return d
 
   def getRightBorder(self, border):
@@ -297,7 +282,7 @@ class GameOb:
     rightTile = (i1 + rtdi, j1 + rtdj)
     if (not self.getOwner(rightTile) == None) and self.getOwner(rightTile) == self.getOwner(t1):
       return (rightTile[0], rightTile[1], i2, j2)
-    elif not self.getOwner(rightTile) == None:
+    elif not self.getOwner(rightTile) == None and self.getOwner(rightTile) == self.getOwner(t2):
       return (i1, j1, rightTile[0], rightTile[1])
     else:
       return None
@@ -318,7 +303,7 @@ class GameOb:
     leftTile = (i1 + ltdi, j1 + ltdj)
     if (not self.getOwner(leftTile) == None) and self.getOwner(leftTile) == self.getOwner(t1):
       return (leftTile[0], leftTile[1], i2, j2)
-    elif not self.getOwner(leftTile) == None:
+    elif not self.getOwner(leftTile) == None and self.getOwner(leftTile) == self.getOwner(t2):
       return (i1, j1, leftTile[0], leftTile[1])
     else:
       return None
@@ -326,24 +311,16 @@ class GameOb:
 
 
   def resolveAttacks(self):
-    print('in resolve Attacks')
-    print(self.borders[2][2][1][2])
-    print(self.borders)
 
     for (i,j) in getTerritoryIndices(self.bew):
       attacks = [0 for _ in range(self.numPlayers())]
-      verbose = (i,j) == (3,2)
       for di,dj in DIDJ:
         defending_border =  (i,j,i+di,j+dj)
         attacking_border =  (i+di,j+dj,i,j)
         
         attack = self.getAttackStrength(attacking_border)
         defend = self.getDefendStrength(defending_border)
-        if verbose:
-          print('attacking_border:' + str(attacking_border))
-          print('defending_border:' + str(defending_border))
-          print('attack strength: ' + str(attack))
-          print('defend strength: ' + str(defend))
+        defend += self.getAttackStrength(defending_border)
         if attack and attack > defend:
           attacks[self.getBorderOwner(attacking_border)] += attack
           # first tiebreaker is total attack strength
@@ -351,23 +328,16 @@ class GameOb:
           #attacks[self.getOwner(b)][1] += self.getAttack(attacking_border)
           ## third tiebreaker is number of won borders
           #attacks[self.getBorderOwner(b)][2] += 1
-      if verbose:
-        print('attacks:')
-        print(attacks)
       if max(attacks) > 0:
-        print("INSIDE MAX")
-        print(attacks)
-        print((i,j))
         # if there is a tie in attacks, no change of ownership
         if Counter(attacks)[max(attacks)] > 1:
-          print("FOUND TIE")
           continue
         self.owners[i][j] = max(enumerate(attacks), key=lambda x: x[1])[0]
     for i in range(len(self.available)):
       for j in range(len(self.available[i])):
         self.available[i][j] = self.maxTroops(i,j)
     # zero all borders
-    self.borders = [[[[None for _ in range(3)] for _ in range(3)] for _ in range(2*self.bew-1)] for _ in range(2*self.bew-1)]
+    self.borders = [[[[0 for _ in range(3)] for _ in range(3)] for _ in range(2*self.bew-1)] for _ in range(2*self.bew-1)]
     
 
   def isInternal(self, border):
@@ -377,7 +347,7 @@ class GameOb:
 
   def getAssignment(self, border):
     (i1,j1,i2,j2) = border
-    return [i1,j1,i2,j2,self.getAttack(border), self.getDefend(border), self.getAttackStrength(border),self.getDefendStrength(border)]
+    return [i1,j1,i2,j2, self.getAttack(border), self.getDefend(border), self.getAttackStrength(border),self.getDefendStrength(border)]
 
   def getPubAssignment(self, border):
     (i1,j1,i2,j2) = border
@@ -446,14 +416,27 @@ class GameOb:
     if self.isInternal(border):
       raise InvalidRequest('tried to assign troops to internal border')
     if opp == None:
-      raise InvalidRequest('tried to assign troops to a border with a body of water')
+      raise InvalidRequest('tried to attack a body of water')
     if not self.isValidBorder(border):
       raise InvalidRequest('tried to assign troops to invalid border')
     available = self.available[player][opp]
     defend = self.getDefend(border)
     attack = self.getAttack(border)
 
-    if ((is_attack == (self.getDefend(border) == 0)) or (is_defend == (self.getAttack(border) == 0))) and available == 0:
+    #if self.getTerrain(t1) == 'hills': 
+    #  # when terrain is hills, is_attack = True means "assign troops"
+    #  if self.borders[i1][j1][i2-i1+1][j2-j1+1] > 0 and not is_attack:
+    #    self.borders[i1][j1][i2-i1+1][j2-j1+1] -= 1
+    #    self.available[player][opp] += 1
+    #  elif not is_attack:
+    #    raise InvalidRequest('tried to remove troops from hills when none there')
+    #  elif is_attack and not available:
+    #    raise InvalidRequest('tried to assign troops when none available')
+    #  else:
+    #    self.borders[i1][j1][i2-i1+1][j2-j1+1] += 1
+    #    self.available[player][opp] -= 1
+
+    if ((is_attack == (self.getDefend(border) == 0)) or (is_defend == (self.getAttack(border) == 0))) and not available:
       raise InvalidRequest('tried to assign troops when none available')
     else:
         self.borders[i1][j1][i2-i1+1][j2-j1+1] += 2 * int(bool(is_attack)) - 1

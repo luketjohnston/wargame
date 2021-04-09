@@ -1,4 +1,4 @@
-import {territory, BOARD_CONTAINER, TILE_WIDTH, getX, getY } from './board.js'
+import {PLAYER_COLORS, territory, BOARD_CONTAINER, TILE_WIDTH, getX, getY } from './board.js'
 import {rightDisplay} from './display.js'
 import {vecFromPolar} from './utils.js'
 import {PLAYER, BOARD_EDGE_WIDTH, sheet} from './interface.js'
@@ -242,8 +242,10 @@ function updateTroopDisplay(border) {
     return s
   }
   let makeTroop = () => {
+    let owner = territory[border.ijij[0]][border.ijij[1]].owner
     let trp = new PIXI.Graphics()
-    trp.beginFill(0x000000)
+    trp.beginFill(PLAYER_COLORS[owner])
+    trp.lineStyle(2, 0x000000, 1)
     let r = 8
     trp.drawCircle(r,r,r)
     trp.endFill()
