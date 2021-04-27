@@ -15,6 +15,8 @@ function onmessage(e) {
   } else if ('waitMessage' in message) {
     readies = [true] * usernames.length
     updateReadyIndicators(readies)
+  } else if ('gamestate' in message) {
+    updateGamestate(message['gamestate']);
   } else {
     updateGamestate(message);
   }

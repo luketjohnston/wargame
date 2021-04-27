@@ -388,12 +388,6 @@ class GameOb:
         terrain.append([i,j,TERRAIN_TO_NUM[ter]])
     return terrain
 
-  # only called during phase 0, for resetting 
-  def getAssignmentOneOpp(self, player, opp):
-    assert self.getPhase() == 0
-    for b in self.allBorders():
-      assignment.append(self.getPubAssignment(b))
-
   def reset(self, player, opp):
     if (not self.getPhase()  == 0):
       raise InvalidRequest('Cannot reset after the assignment phase')
@@ -401,12 +395,19 @@ class GameOb:
       raise InvalidRequest('You need to unready before resetting')
       
     self.available[player][opp] = self.maxTroops(player,opp)
+    assignments = []
     for b in self.allBorders():
-      if self.targetOwner(b) == opp and self.borderOwner(b) == player:
+      (t1, t2) = ((b[0],b[1]),(b[2],b[3]))
+      if self.getOwner(t2) == opp and self.getOwner(t1) == player:
         self.setTroops(b, 0)
+        # "pub" assignment here is so that we can construct the assignments 
+        # in this for loop (otherwise we would have to reset all of them, and
+        # then iterate through again, so that getAssignment doesn't take into
+        # account strength from adjacent borders that haven't been reset yet)
+        assignments.append(self.getPubAssignment(b))
 
     troopUpdate = [[opp, self.available[player][opp]]]
-    return (troopUpdate, self.getAssignmentOneOpp(player, opp))
+    return (troopUpdate, assignments)
     
 
   def incTroopsIfPossible(self, border, player, is_attack):

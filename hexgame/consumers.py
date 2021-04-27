@@ -1,152 +1,105 @@
 import json
 import jsonpickle
 from channels.generic.websocket import WebsocketConsumer
+from channels.consumer import SyncConsumer, AsyncConsumer
 from .models import *
 from .game import InvalidRequest
-from asgiref.sync import async_to_sync
+from asgiref.sync import async_to_sync, sync_to_async
 
-class GameConsumer(WebsocketConsumer):
-  def connect(self):
-    self.gamename = self.scope['url_route']['kwargs']['gamename']
-    gq = GameFile.objects.filter(name=self.gamename)
-    self.username = "TODO"
-    self.invalid = False
-    self.accept()
-    if gq:
-      self.model = gq[0]
-      self.game = self.model.getGame()
-      self.id = self.model.id
-    else:
-      self.invalid = True
-      self.send(json.dumps({'invalid': 'That game doesn\'t exist!'}))
-      self.close()
-      return
-    self.room_group_name = str(self.model.id)
+class GameConsumer(SyncConsumer):
 
-    self.session_key = self.scope['session'].session_key
-    try:
-      self.player = self.game.getPlayer(self.session_key)
-    except InvalidRequest as e:
-      self.send(json.dumps({'invalid': 'you havent joined this game'}))
+  def getGameModel(self, event):
+    gamename = event['gamename']
+    gq = GameFile.objects.filter(name=gamename)
+    model = gq[0]
+    return model
 
-    # TODO what happens if multiple windows opened with same session?
-    # will there be multiple controllers?
-
-    self.controller_group = GameConsumer.staticControllerGroup(self.id)
-
-    if self.isController():
-      async_to_sync(self.channel_layer.group_add)(
-        self.controller_group,
-        self.channel_name,
-      )
-
-    print('room group name: ') 
-    print(self.room_group_name) 
-    
-    async_to_sync(self.channel_layer.group_add)(
-      self.room_group_name,
-      self.channel_name,
-    )
-    async_to_sync(self.channel_layer.group_add)(
-      self.playerGroup(self.player),
-      self.channel_name,
-    )
-
-    gamestate = self.game.getGamestate(self.player)
-    if self.game.phase >= 0:
-      gamestate['board_edge_width'] = self.game.bew
-      gamestate['terrain'] = self.game.getAllTerrain()
-
-    self.send(text_data=json.dumps(gamestate))
-    
-    # request readies from the controller
+  def sendErrorMessage(self, gamename, session_key, message):
+    playerGroup = getPlayerGroup(gamename, session_key)
     async_to_sync(self.channel_layer.group_send)(
-      self.controller_group,
-      {'type': 'processMessage',
-       'requestReadies': None,
-       'player':self.player}
-      )
+      playerGroup,
+      {'type': errorMessage,
+       'message': message})
 
 
+  def playerJoined(self, event):
+    session_key = event['session_key']
+    gamename = event['gamename']
+    model = self.getGameModel(event)
+    game = model.getGame()
 
-  def playerGroup(self, i):
-    return str(self.id) + '_player_' + str(i)
-  def gameGroup(self):
-    return str(self.id)
-  def controllerGroup(self):
-    return self.controller_group
-
-  def staticControllerGroup(game_id):
-    return str(game_id) + '_controller'
-  def staticGameGroup(game_id):
-    return str(game_id)
-
-  def isController(self):
-    return self.player == 0
-
-  def disconnect(self, close_code):
-    if not self.invalid:
-      async_to_sync(self.channel_layer.group_discard)(
-          self.room_group_name,
-          self.channel_name
-        )
-
-  # receive message from websocket
-  def receive(self, text_data):
-    if self.isController():
-      self.processMessage(
-        {'text_data':text_data,
-         'player':self.player}
-        )
-    else:
+    try:
+      player = game.getPlayer(session_key)
+    except InvalidRequest as e:
+      playerGroup = getPlayerGroup(gamename, session_key)
       async_to_sync(self.channel_layer.group_send)(
-        self.controller_group,
-        {'type': 'processMessage',
-         'text_data':text_data,
-         'player':self.player}
-        )
-        
+        playerGroup,
+        {'type': errorMessage,
+         'message': 'You haven\'t joined this game!'})
+      return
+
+
+    # send usernames to all players 
+    async_to_sync(self.channel_layer.group_send)(
+      getGameGroup(gamename),
+      {'type': 'update',
+       'usernames': game.usernames})
+
+    # send gamestate info to player who just joined
+    gamestate = game.getGamestate(player)
+    if game.phase >= 0:
+      gamestate['board_edge_width'] = game.bew
+      gamestate['terrain'] = game.getAllTerrain()
+  
+    async_to_sync(self.channel_layer.group_send)(
+      getPlayerGroup(gamename, session_key),
+      {'type': 'update',
+       'gamestate': gamestate})
 
   def processMessage(self, event):
-    assert self.isController()
-
     if 'text_data' in event:
       message = json.loads(event['text_data'])
-    player = event['player']
-    game = self.game
+    model = self.getGameModel(event)
+    game = model.getGame()
+    session_key = event['session_key']
+    gamename = event['gamename']
     response = {}
     response['type'] = 'update'
-    response_group = self.playerGroup(player)
+    response_group = getPlayerGroup(gamename, session_key)
 
     try:
+      player = game.getPlayer(session_key)
       if 'requestReadies' in event:
         response['readies'] = game.readies
       elif 'unready' in message:
         game.unreadyPlayer(player)
         # send player reset message
-        response_group = self.gameGroup()
+        response_group = getGameGroup(gamename)
         response['readies'] = game.readies
+        model.saveGame(game)
       elif 'reset' in message:
-        opp = message['opp']
+        print('in reset')
+        print(message)
+        opp = message['reset']
         troopUpdate, assignment = game.reset(player, opp)
-        response['assignments'] = assignment
         response['troopUpdate'] = troopUpdate
+        response['assignments'] = assignment
+        model.saveGame(game)
       elif 'assignment' in message:
         troopUpdate, assignments = game.processAssignment(player, message['assignment'])
         response['assignments'] = assignments
         response['troopUpdate'] = troopUpdate
+        model.saveGame(game)
       elif 'playerReady' in message:
-        response_group = self.gameGroup()
+        response_group = getGameGroup(gamename)
         game.readyPlayer(player)
         if game.allReady():
-          # TODO can we send a response instantly, indicating server is 
-          # processing?
           game.allReadyUpdate();
-          self.model.saveGame(game)
           response['type'] = 'nextPhase'
           response['game'] = jsonpickle.encode(game)
         else: 
           response['readies'] = game.readies
+        model.saveGame(game)
 
       async_to_sync(self.channel_layer.group_send)(
         response_group,
@@ -154,30 +107,83 @@ class GameConsumer(WebsocketConsumer):
       )
     except InvalidRequest as e:
       response = {}
-      response['invalid'] = str(e)
       response['type'] = 'update'
+      response['invalid'] = str(e)
       async_to_sync(self.channel_layer.group_send)(
-        self.playerGroup(player),
+        getPlayerGroup(gamename, session_key),
         response
       )
 
-  def getGameFromFile(self):
-    gq = GameFile.objects.get(name=self.gamename)
-    return gq.getGame()
-      
-  def playerAdded(self, event):
-    game = self.getGameFromFile()
-    if self.isController():
-      self.game = game
-    self.send(json.dumps({'usernames': game.usernames}))
+def getPlayerGroup(gamename, session_key):
+  return str(gamename) + '_player_' + str(session_key)
+def getGameGroup(gamename):
+  return str(gamename) + '_game'
     
 
+class PlayerConsumer(WebsocketConsumer):
+  def connect(self):
+    print('in connect')
+    self.gamename = self.scope['url_route']['kwargs']['gamename']
+    self.session_key = self.scope['session'].session_key
+    self.username = "TODO"
+    self.accept()
+
+    async_to_sync(self.channel_layer.group_add)(
+      self.gameGroup(),
+      self.channel_name,
+    )
+    async_to_sync(self.channel_layer.group_add)(
+      getPlayerGroup(self.gamename, self.session_key),
+      self.channel_name,
+    )
+    async_to_sync(self.channel_layer.send)(
+      'game_consumer',
+      {'type': 'playerJoined',
+       'gamename': self.gamename,
+       'session_key' : self.session_key}
+      )
+
+  def gameGroup(self):
+    return getGameGroup(self.gamename)
+
+  def disconnect(self, close_code):
+    async_to_sync(self.channel_layer.group_discard)(
+        self.gameGroup(),
+        self.channel_name
+      )
+    # TODO: add playerDisconnect handling, maybe send info to client
+    # about what players are connected currently?
+    #async_to_sync(self.channel_layer.send)(
+    #    'game_consumer',
+    #    {'type': 'playerDisconnect',
+    #     'gamename': self.gamename,
+    #    'session_key': self.session_key,}
+    #  )
+
+    
+
+  # receive message from websocket
+  def receive(self, text_data):
+    async_to_sync(self.channel_layer.send)(
+      'game_consumer',
+      {'type': 'processMessage',
+       'text_data':text_data,
+       'gamename': self.gamename,
+       'session_key':self.session_key}
+      )
+
+  def errorMessage(self, event):
+    self.send(json.dumps(event['message']))
+      
   def update(self, event):
+    print('event')
+    print(event)
     self.send(json.dumps(event))
 
   def nextPhase(self, event):
     game = jsonpickle.decode(event['game'])
-    gamestate = game.getGamestate(self.player)
+    player = game.getPlayer(self.session_key)
+    gamestate = game.getGamestate(player)
     # game just started, need to send terrain and board edge width
     if game.phase == 0:
       gamestate['board_edge_width'] = game.bew

@@ -13,7 +13,9 @@ def getGamepath():
   return os.path.join(settings.LOCAL_FILE_DIR, 'game_savefiles')
 
 class GameFile(models.Model):
+  running = models.BooleanField(default=False)
   name = models.CharField(max_length=50, unique=True)
+
   def filepath(self):
     filepath = os.path.join(settings.GAMEFILES_DIR, self.name + '.pickle')
     return filepath

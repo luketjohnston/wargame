@@ -59,10 +59,10 @@ def joinGame(request, gamename):
     p = game.addPlayer(key, username)
     gf.saveGame(game)
 
-    async_to_sync(get_channel_layer().group_send)(
-      GameConsumer.staticGameGroup(gf.id),
-      {'type': 'playerAdded'}
-    )
+    #async_to_sync(get_channel_layer().group_send)(
+    #  GameConsumer.gameGroup(gf.id),
+    #  {'type': 'playerAdded'}
+    #)
      
     
   except ObjectDoesNotExist:
