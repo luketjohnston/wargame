@@ -3,8 +3,12 @@ import jsonpickle
 from channels.generic.websocket import WebsocketConsumer
 from channels.consumer import SyncConsumer, AsyncConsumer
 from .models import *
-from .game import InvalidRequest
 from asgiref.sync import async_to_sync, sync_to_async
+
+class InvalidRequest(Exception):
+  pass
+class GameTerminated(Exception):
+  pass
 
 class GameConsumer(SyncConsumer):
 
@@ -56,7 +60,36 @@ class GameConsumer(SyncConsumer):
       {'type': 'update',
        'gamestate': gamestate})
 
+  def timeIsUp(self, event):
+    model = self.getGameModel(event)
+    game = model.getGame()
+    if game.phase == event['phase']:
+      try:
+        game.allReadyUpdate();
+        response = {}
+        response['type'] = 'nextPhase'
+        response['game'] = jsonpickle.encode(game)
+        response_group = getGameGroup(event['gamename'])
+        async_to_sync(self.channel_layer.group_send)(
+          response_group,
+          response
+        )
+        model.saveGame(game)
+      except GameTerminated:
+        model.cleanupGame()
+        response = {}
+        response['type'] = 'update'
+        response['terminated'] = 'Game terminated due to no human-player troop assignments.'
+        response_group = getGameGroup(event['gamename'])
+        async_to_sync(self.channel_layer.group_send)(
+          response_group,
+          response
+        )
+        
+
   def processMessage(self, event):
+    print('processMessage: ')
+    print(event)
     if 'text_data' in event:
       message = json.loads(event['text_data'])
     model = self.getGameModel(event)
@@ -71,6 +104,11 @@ class GameConsumer(SyncConsumer):
       player = game.getPlayer(session_key)
       if 'requestReadies' in event:
         response['readies'] = game.readies
+      elif 'addAI' in message:
+        game.addAI()
+        response['usernames'] = game.usernames
+        response['readies'] = game.readies
+        model.saveGame(game)
       elif 'unready' in message:
         game.unreadyPlayer(player)
         # send player reset message
@@ -122,7 +160,6 @@ def getGameGroup(gamename):
 
 class PlayerConsumer(WebsocketConsumer):
   def connect(self):
-    print('in connect')
     self.gamename = self.scope['url_route']['kwargs']['gamename']
     self.session_key = self.scope['session'].session_key
     self.username = "TODO"
@@ -164,6 +201,7 @@ class PlayerConsumer(WebsocketConsumer):
 
   # receive message from websocket
   def receive(self, text_data):
+    # just forward the message to game_consumer (the game controller)
     async_to_sync(self.channel_layer.send)(
       'game_consumer',
       {'type': 'processMessage',

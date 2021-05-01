@@ -29,3 +29,7 @@ class GameFile(models.Model):
       print(f)
       pickle.dump(game, f)
       print('done dump')
+
+  def cleanupGame(self):
+    os.remove(self.filepath())
+    self.delete()

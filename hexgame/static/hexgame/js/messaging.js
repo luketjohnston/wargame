@@ -65,9 +65,13 @@ function readyMessage() {
   chatSocket.send(JSON.stringify({'playerReady':true}))
 }
 
+function addAIMessage() {
+  chatSocket.send(JSON.stringify({'addAI':true}))
+}
+
 function assignmentMessage(i1,j1,i2,j2,attack) {
   chatSocket.send(JSON.stringify({'assignment': [i1,j1,i2,j2,attack]}))
 }
 
-export {startSocket, resetMessage, readyMessage, assignmentMessage, unreadyMessage}
+export {addAIMessage, startSocket, resetMessage, readyMessage, assignmentMessage, unreadyMessage}
 

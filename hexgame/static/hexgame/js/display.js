@@ -1,6 +1,6 @@
 import {PLAYER_COLORS} from './board.js'
 import {numPlayers, PLAYER, isReady, phase} from './interface.js'
-import {resetMessage, readyMessage, unreadyMessage} from './messaging.js'
+import {addAIMessage, resetMessage, readyMessage, unreadyMessage} from './messaging.js'
 import {selectedBorder} from './borders.js'
 
 const TEXT_STYLE = new PIXI.TextStyle({
@@ -53,10 +53,17 @@ function makeRightDisplay(app) {
   disp.addChild(startMessage)
   disp.started = false
 
+  let addAIButton = makeAddAIButton()
+  disp.addChild(addAIButton)
+  addAIButton.x = DISP_WIDTH / 2 - addAIButton.width / 2
+  addAIButton.y = yoffset + 80
+  
+
   disp.startGame = () => {
     disp.started = true
     console.log("IN DISP STARTGAME")
     startMessage.visible = false
+    addAIButton.visible = false
     let t1 = new PIXI.Text('Available troops:')
     t1.x = 20
     t1.y = yoffset
@@ -213,6 +220,44 @@ function makeRightDisplay(app) {
 
   rightDisplay = disp
 }
+
+function makeAddAIButton() {
+  let group = new PIXI.Container();
+
+  let button = new PIXI.Graphics();
+  button.lineStyle(4,0xFFFFFF,1)
+  //ready.beginFill(0x111111);
+  button.drawRect(0,0,330, 40)
+  //ready.endFill();
+
+  let text = new PIXI.Text("Add Computer Player");
+  Object.assign(text.style, TEXT_STYLE)
+  text.x = button.width / 2 - text.width / 2; 
+  text.y = button.height / 2 - text.height / 2;
+
+  group.addChild(button); group.addChild(text); 
+
+  group.interactive = true;
+  group.buttonMode = true;
+
+  let mouseover = function() {
+    button.tint = PLAYER_COLORS[PLAYER]
+    text.tint = PLAYER_COLORS[PLAYER]
+  }
+  let mouseout = function() {
+    button.tint = 0xFFFFFF
+    text.tint = 0xFFFFFF
+  }
+  group
+      .on('mouseover', mouseover)
+      .on('mouseout', mouseout)
+      .on('mouseup', addAIMessage)
+      .on('touchend', addAIMessage)
+      .on('mouseupoutside', addAIMessage)
+      .on('touchendoutside', addAIMessage)
+  return group
+}
+  
 
 function makeReadyButton() {
   let group = new PIXI.Container();

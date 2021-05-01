@@ -1,5 +1,8 @@
 from collections import defaultdict, Counter
 import random
+from datetime import datetime, timedelta, timezone
+from .tasks import nextPhase as nextPhaseTask
+from .consumers import InvalidRequest, GameTerminated
 
 
 MIN_START_TILES_PER_PLAYER = 5
@@ -10,8 +13,6 @@ DIDJ = ((0,1),(0,-1),(1,0),(-1,0),(1,1),(-1,-1))
 NUM_PHASES = 2
 NUM_TURNS = 10
 
-class InvalidRequest(Exception):
-  pass
 
 def boardEdgeWidth(np):
   bew = 1
@@ -42,6 +43,17 @@ class GameOb:
     self.name = name
     self.phase = -1
     self.bew = 0
+    self.ainum = 0
+    self.is_ai = []
+    # if a game isn't started in 1 minutes after it's created, it will be
+    # started automatically
+    self.nextPhaseTime = datetime.now(timezone.utc) + timedelta(minutes=10)
+    self.turnTime = timedelta(minutes=0.2)
+
+    # delay celery task by nextPhaseTime to advance phase
+    nextPhaseTask.apply_async((self.name,self.phase), eta=self.nextPhaseTime)
+    
+
 
   def getAllTerritories(self):
     return getTerritoryIndices(self.bew)
@@ -56,11 +68,20 @@ class GameOb:
 
   def addPlayer(self, key, username):
     if self.territories:
-      raise InvalidRequest('Game is already started')
+      raise InvalidRequest('Game is already started, can\'t add any more players.')
     self.usernames.append(username)
+    self.is_ai.append(False)
     self.readies.append(False)
     self.keys[key] = len(self.usernames) - 1
     return len(self.usernames) - 1
+
+  def addAI(self):
+    if self.territories:
+      raise InvalidRequest('Game is already started, can\'t add any more players.')
+    self.usernames.append('Bot_' + str(self.ainum))
+    self.ainum += 1
+    self.readies.append(True)
+    self.is_ai.append(True)
 
   def maxTroops(self,p1,p2):
     troops = 0
@@ -79,7 +100,7 @@ class GameOb:
     (i1,j1,i2,j2) = b
     return self.borders[i1][j1][i2-i1+1][j2-j1+1]
   def getTurn(self):
-    return (self.phase // NUM_PHASES) % NUM_TURNS
+    return (self.phase // NUM_PHASES) 
 
   def readyPlayer(self, p):
     self.readies[p] = True
@@ -127,6 +148,13 @@ class GameOb:
     return self.borders[i1][j1][i2-i1+1][j2-j1+1]
   def getBorder_didj(i1,j1,di,dj):
     return self.borders[i1][j1][di+1][dj+1]
+  def getBorderValue(self, b):
+    (i1,j1,i2,j2) = b
+    return self.borders[i1][j1][i2-i1+1][j2-j1+1]
+  def setBorderValue(self, b, v):
+    (i1,j1,i2,j2) = b
+    self.borders[i1][j1][i2-i1+1][j2-j1+1] = v
+    
 
   def processAssignment(self, player, assignment):
     if self.isReady(player):
@@ -145,16 +173,42 @@ class GameOb:
     if self.phase == -1: return -1
     return self.phase % 2
 
+  def assignTroopsAI(self):
+    for player,isAI in enumerate(self.is_ai):
+      if not isAI: continue
+      for opp,_ in enumerate(self.is_ai):
+        if opp == player: continue
+        borders = list(self.getBordersBetween(player, opp))
+        for t in range(self.available[player][opp]):
+          # select random border, add a troop to it
+          b = random.choice(borders)
+          bv = self.getBorderValue(b) 
+          # if border already has assigned troops, add a troop of the same type
+          # (if attacking, add attacker. if defending, add defender)
+          if not bv == 0:
+            troop_type = 2 * int(bv > 0) - 1
+          else:
+            troop_type = random.choice([-1,1])
+          self.setBorderValue(b, bv + troop_type)
+
+  def getBordersBetween(self, player, opp):
+    for b in self.allBorders():
+      (t1,t2) = b[0:2],b[2:]
+      if self.getOwner(t1) == player and self.getOwner(t2) == opp:
+        yield b
+        
+
   def allReadyUpdate(self):
-    assert self.allReady()
     if (self.getPhase() == -1):
       self.startGame()
     elif (self.getPhase() % 2 == 0):
-      pass
+      self.assignTroopsAI()
     elif (self.getPhase() % 2 == 1):
       self.resolveAttacks()
     self.phase += 1
-    self.readies = [False] * self.numPlayers()
+    self.readies = self.is_ai.copy()
+    self.nextPhaseTime = datetime.now(timezone.utc) + self.turnTime
+    nextPhaseTask.apply_async((self.name,self.phase), eta=self.nextPhaseTime)
 
 
   def getBaseAttack(self, border):
@@ -312,23 +366,23 @@ class GameOb:
 
   def resolveAttacks(self):
 
+    human_troop_assigned = False
     updates = []
     for (i,j) in getTerritoryIndices(self.bew):
       attacks = [0 for _ in range(self.numPlayers())]
       for di,dj in DIDJ:
         defending_border =  (i,j,i+di,j+dj)
         attacking_border =  (i+di,j+dj,i,j)
+        if not self.isValidBorder(attacking_border):
+          continue
+        if (not self.getBorderValue(attacking_border) == 0) and not self.is_ai[self.getBorderOwner(attacking_border)]:
+          human_troop_assigned = True
         
         attack = self.getAttackStrength(attacking_border)
         defend = self.getDefendStrength(defending_border)
         defend += self.getAttackStrength(defending_border)
         if attack and attack > defend:
           attacks[self.getBorderOwner(attacking_border)] += attack
-          # first tiebreaker is total attack strength
-          ## second tiebreaker is number of total attacking troops
-          #attacks[self.getOwner(b)][1] += self.getAttack(attacking_border)
-          ## third tiebreaker is number of won borders
-          #attacks[self.getBorderOwner(b)][2] += 1
       if max(attacks) > 0:
         # if there is a tie in attacks, no change of ownership
         if Counter(attacks)[max(attacks)] > 1:
@@ -341,6 +395,12 @@ class GameOb:
         self.available[i][j] = self.maxTroops(i,j)
     # zero all borders
     self.borders = [[[[0 for _ in range(3)] for _ in range(3)] for _ in range(2*self.bew-1)] for _ in range(2*self.bew-1)]
+    # if no human assigned any troops and no human was "ready" for the next
+    # phase, terminate the game
+    if (not human_troop_assigned) and self.is_ai == self.readies:
+      # went a turn without any human assigning any troops. Delete game
+      raise GameTerminated()
+      
     
 
   def isInternal(self, border):
@@ -400,7 +460,7 @@ class GameOb:
       (t1, t2) = ((b[0],b[1]),(b[2],b[3]))
       if self.getOwner(t2) == opp and self.getOwner(t1) == player:
         self.setTroops(b, 0)
-        # "pub" assignment here is so that we can construct the assignments 
+        # "Pub" assignment here is so that we can construct the assignments 
         # in this for loop (otherwise we would have to reset all of them, and
         # then iterate through again, so that getAssignment doesn't take into
         # account strength from adjacent borders that haven't been reset yet)
@@ -426,19 +486,6 @@ class GameOb:
     available = self.available[player][opp]
     defend = self.getDefend(border)
     attack = self.getAttack(border)
-
-    #if self.getTerrain(t1) == 'hills': 
-    #  # when terrain is hills, is_attack = True means "assign troops"
-    #  if self.borders[i1][j1][i2-i1+1][j2-j1+1] > 0 and not is_attack:
-    #    self.borders[i1][j1][i2-i1+1][j2-j1+1] -= 1
-    #    self.available[player][opp] += 1
-    #  elif not is_attack:
-    #    raise InvalidRequest('tried to remove troops from hills when none there')
-    #  elif is_attack and not available:
-    #    raise InvalidRequest('tried to assign troops when none available')
-    #  else:
-    #    self.borders[i1][j1][i2-i1+1][j2-j1+1] += 1
-    #    self.available[player][opp] -= 1
 
     if ((is_attack == (self.getDefend(border) == 0)) or (is_defend == (self.getAttack(border) == 0))) and not available:
       raise InvalidRequest('tried to assign troops when none available')
@@ -472,6 +519,7 @@ class GameOb:
     gamestate['turn'] = self.getTurn()
     gamestate['readies'] = self.readies
     gamestate['gamename'] = self.name
+    gamestate['nextPhaseTime'] = self.nextPhaseTime.isoformat()
     if self.phase >= 0:
       gamestate['territory_owners'] = self.owners
       gamestate['assignments'] = self.getAllAssignments(player)

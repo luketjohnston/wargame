@@ -11,6 +11,8 @@ var phase = -1;
 var turn;
 var BOARD_EDGE_WIDTH;
 var phaseText;
+var timerText;
+var nextPhaseTime;
 
 const INDIC_CONT = new PIXI.Container()
 
@@ -46,7 +48,7 @@ if(!PIXI.utils.isWebGLSupported()){
 
 PIXI.utils.sayHello(type)
 
-let app = new PIXI.Application({width: 256, height: 256});
+let app = new PIXI.Application();
 var sheet;
 
 // the following are set by board.html:
@@ -84,6 +86,16 @@ function setup(loader, resources) {
   // so that first call to updateGamestate doesn't happen before
   // everything is initialized
   startSocket()
+
+  // start function to update turn timer
+  setInterval(function() {
+    if (nextPhaseTime !== undefined) {
+      let diff = nextPhaseTime - (new Date())
+      console.log('here')
+      console.log(Math.floor(diff/1000))
+      timerText.text = 'Turn timer: ' + String(Math.floor(diff/1000))
+    }
+  }, 1000)
 
 }
 
@@ -159,7 +171,13 @@ function updateGamestate(gamestate) {
   if ('readies' in gamestate) {
     updateReadyIndicators(gamestate.readies);
   }
+  if ('nextPhaseTime' in gamestate) {
+    console.log('setting nextPHaseTime')
+    console.log(gamestate.nextPhaseTime)
+    nextPhaseTime = new Date(gamestate.nextPhaseTime)
+  }
 }
+
 
 function numPlayers() {
   return readyIndicators.length
@@ -174,10 +192,10 @@ function gameLoop(delta) {
     BOARD_CONTAINER.x += delta * BOARD_SPEED
   }
   if (UP.isDown || W_KEY.isDown) {
-    BOARD_CONTAINER.y -= delta * BOARD_SPEED
+    BOARD_CONTAINER.y += delta * BOARD_SPEED
   }
   if (DOWN.isDown || S_KEY.isDown) {
-    BOARD_CONTAINER.y += delta * BOARD_SPEED
+    BOARD_CONTAINER.y -= delta * BOARD_SPEED
   }
 }
 
@@ -235,10 +253,16 @@ function createPlayerList() {
   Object.assign(phaseText.style, TEXT_STYLE)
   phaseText.x = 20;
   phaseText.y = 100;
+
+  timerText = new PIXI.Text('Turn timer: ');
+  Object.assign(timerText.style, TEXT_STYLE)
+  timerText.x = 20;
+  timerText.y = app.renderer.height - 50;
    
 
 
   app.stage.addChild(gameText);
+  app.stage.addChild(timerText);
   app.stage.addChild(phaseText);
 }
 
@@ -281,6 +305,7 @@ function isReady(player) {
 window.onresize = function() {
   app.renderer.resize(window.innerWidth, window.innerHeight);
   rightDisplay.updateSize();
+  timerText.y = app.renderer.height - 50;
 }
 
 

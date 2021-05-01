@@ -157,3 +157,8 @@ CHANNEL_LAYERS = {
 
 
 django_heroku.settings(locals())
+
+
+# Celery Configuration Options 
+CELERY_BROKER_URL = 'redis://localhost:6379'
+CELERY_RESULT_BACKEND = CELERY_BROKER_URL
