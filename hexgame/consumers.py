@@ -15,6 +15,7 @@ class GameConsumer(SyncConsumer):
   def getGameModel(self, event):
     gamename = event['gamename']
     gq = GameFile.objects.filter(name=gamename)
+    if not gq: raise GameTerminated
     model = gq[0]
     return model
 
@@ -29,7 +30,18 @@ class GameConsumer(SyncConsumer):
   def playerJoined(self, event):
     session_key = event['session_key']
     gamename = event['gamename']
-    model = self.getGameModel(event)
+    try:
+      model = self.getGameModel(event)
+    except GameTerminated:
+      response = {}
+      response['type'] = 'update'
+      response['terminated'] = 'Game does not exist!'
+      response_group = getPlayerGroup(gamename, session_key)
+      async_to_sync(self.channel_layer.group_send)(
+        response_group,
+        response
+      )
+      return
     game = model.getGame()
 
     try:
@@ -92,7 +104,19 @@ class GameConsumer(SyncConsumer):
     print(event)
     if 'text_data' in event:
       message = json.loads(event['text_data'])
-    model = self.getGameModel(event)
+    try:
+      model = self.getGameModel(event)
+    except GameTerminated:
+      response = {}
+      response['type'] = 'update'
+      response['terminated'] = 'Game does not exist!'
+      response_group = getGameGroup(event['gamename'])
+      async_to_sync(self.channel_layer.group_send)(
+        response_group,
+        response
+      )
+      return
+      
     game = model.getGame()
     session_key = event['session_key']
     gamename = event['gamename']

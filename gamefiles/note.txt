@@ -1,0 +1,2 @@
+This directory is used to store the pickled games. the GameFile model in 
+hexgame/models.py handles saving and loading of these games.

@@ -12,6 +12,7 @@ var turn;
 var BOARD_EDGE_WIDTH;
 var phaseText;
 var timerText;
+var timerInterval;
 var nextPhaseTime;
 
 const INDIC_CONT = new PIXI.Container()
@@ -88,11 +89,9 @@ function setup(loader, resources) {
   startSocket()
 
   // start function to update turn timer
-  setInterval(function() {
+  timerInterval = setInterval(function() {
     if (nextPhaseTime !== undefined) {
       let diff = nextPhaseTime - (new Date())
-      console.log('here')
-      console.log(Math.floor(diff/1000))
       timerText.text = 'Turn timer: ' + String(Math.floor(diff/1000))
     }
   }, 1000)
@@ -175,6 +174,12 @@ function updateGamestate(gamestate) {
     console.log('setting nextPHaseTime')
     console.log(gamestate.nextPhaseTime)
     nextPhaseTime = new Date(gamestate.nextPhaseTime)
+  }
+  console.log('gamestate:')
+  console.log(gamestate)
+  if ('terminated' in gamestate) {
+    timerText.text = gamestate.terminated
+    clearInterval(timerInterval)
   }
 }
 
