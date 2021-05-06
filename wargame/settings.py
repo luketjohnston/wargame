@@ -160,5 +160,5 @@ django_heroku.settings(locals())
 
 
 # Celery Configuration Options 
-CELERY_BROKER_URL = 'redis://localhost:6379'
+CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379')
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
