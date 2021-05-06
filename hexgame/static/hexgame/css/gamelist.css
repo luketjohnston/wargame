@@ -1,0 +1,95 @@
+
+
+body {
+  background-color: #999999;
+  color: #000000;
+  font-family: "Times New Roman", Times, serif;
+  margin-left: 100px;
+  margin-right: 100px;
+}
+
+#quickplay {
+  margin: auto;
+  text-align: center;
+}
+
+#quickplay input {
+  font-size: 20px;
+  padding:5px 15px; 
+  background:#ccc; 
+  border:0 none;
+  cursor:pointer;
+  -webkit-border-radius: 5px;
+  border-radius: 5px; 
+}
+
+#gamelist li {
+  margin-top: 10px;
+}
+
+#gamelist li form {
+  margin-top: 10px;
+}
+
+
+#tactics {
+  font-family: Arial, sans-serif;
+  text-align: center;
+  font-size: 50px;
+  padding-top: 100px;
+  padding-bottom: 20px;
+  color: #bd1600;
+  text-shadow: 2px 2px black;
+  -webkit-text-stroke-width: 2px; 
+  -webkit-text-stroke-color: white; 
+  margin: auto;
+}
+
+#subtitle {
+  text-align: center;
+  margin: auto;
+  padding-bottom: 80px;
+}
+
+figure {
+  min-width: 500px;
+  display: table;
+  margin: auto;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+figcaption {
+  display: table-caption;
+  caption-side: bottom;
+  padding-top: 8px;
+}
+
+img {
+  display: block;
+  margin: auto;
+  border: 2px solid #ddd;
+  border-radius: 4px;
+}
+
+#board {
+  width: 100%;
+}
+
+#tie1, #tie2 {
+  max-width: 300px;
+}
+
+#attack1, #attack2 {
+  max-width: 500px;
+}
+
+#plains, #hills {
+  max-width: 300px;
+}
+
+#mountain_forest {
+  max-width: 500px;
+}
+
+
