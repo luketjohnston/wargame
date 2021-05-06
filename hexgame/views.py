@@ -3,7 +3,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.template import Context
 from hexgame.game import GameOb
 from channels.layers import get_channel_layer
-from hexgame.consumers import GameConsumer
+from hexgame.consumers import GameConsumer, InvalidRequest
 
 from asgiref.sync import async_to_sync
 
@@ -47,12 +47,21 @@ def createGame(request):
     game_file.saveGame(game)
     return redirect('hexgame:gamelist')
 
+def quickPlay(request):
+  username = 'Hero'
+  key = request.session.session_key
+  gamefile = GameFile.makeNewQuickplay()
+  game = GameOb(gamefile.name)
+  game.addPlayer(key, username)
+  for i in range(1):
+    game.addAI()
+  gamefile.save()
+  gamefile.saveGame(game)
+  return redirect('hexgame:board', game.name)
+
 def joinGame(request, gamename):
   username = request.POST['username']
   key = request.session.session_key
-  print('in join game')
-  print(username)
-  print(key)
   try:
     gf = GameFile.objects.get(name=gamename)
     game = gf.getGame()
@@ -67,8 +76,8 @@ def joinGame(request, gamename):
     
   except ObjectDoesNotExist:
     return HttpResponse('Tried to join a game that does not exist! Spooky..')
-  except InvalidRequest:
-    return HttpResponse('That game has already started, rip')
+  except InvalidRequest as e:
+    return HttpResponse(str(e))
   return redirect('hexgame:board', game.name)
 
 

@@ -191,10 +191,10 @@ function numPlayers() {
 
 function gameLoop(delta) {
   if (LEFT.isDown || A_KEY.isDown) {
-    BOARD_CONTAINER.x -= delta * BOARD_SPEED
+    BOARD_CONTAINER.x += delta * BOARD_SPEED
   }
   if (RIGHT.isDown || D_KEY.isDown) {
-    BOARD_CONTAINER.x += delta * BOARD_SPEED
+    BOARD_CONTAINER.x -= delta * BOARD_SPEED
   }
   if (UP.isDown || W_KEY.isDown) {
     BOARD_CONTAINER.y += delta * BOARD_SPEED

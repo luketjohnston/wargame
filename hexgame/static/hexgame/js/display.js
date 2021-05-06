@@ -139,10 +139,11 @@ function makeRightDisplay(app) {
     brk.endFill()
     disp.addChild(brk)
 
-    let selectMessage = new PIXI.Text('Click a border to assign troops');
+    let selectMessage = new PIXI.Text('Click a border to assign troops.\n\nMove around the board\nwith AWSD.');
     selectMessage.style = TEXT_STYLE
     selectMessage.x = 24;
     selectMessage.y = yoffset + 4 - margin;
+
     disp.addChild(selectMessage)
 
     
@@ -183,6 +184,14 @@ function makeRightDisplay(app) {
       defend_s.text = String(selectedBorder.defend_s)
     }
 
+    let controls = new PIXI.Text('Use Q/E keys to assign troops.\nPress Esc to unselect border.');
+    controls.style = TEXT_STYLE
+    controls.x = 24;
+    controls.y = yoffset + 20 + 4 - margin;
+    controls.visible = false;
+    yoffset += 120
+    disp.addChild(controls)
+
     disp.showBorder = function(i1,j1,i2,j2) {
       selectMessage.visible = false
       border = borders[i1][j1][i2][j2]
@@ -197,11 +206,13 @@ function makeRightDisplay(app) {
     disp.hideBorderInfo = function() {
       selectMessage.visible = true
       detailContainer.visible = false
+      controls.visible = false
     }
     console.log('making show border info')
     disp.showBorderInfo = function() {
       selectMessage.visible = false
       detailContainer.visible = true
+      controls.visible = true
     }
     console.log(disp.showBorderInfo)
     disp.updateTroops = (updateList) => {

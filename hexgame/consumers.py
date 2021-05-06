@@ -23,7 +23,7 @@ class GameConsumer(SyncConsumer):
     playerGroup = getPlayerGroup(gamename, session_key)
     async_to_sync(self.channel_layer.group_send)(
       playerGroup,
-      {'type': errorMessage,
+      {'type': 'errorMessage',
        'message': message})
 
 
@@ -50,7 +50,7 @@ class GameConsumer(SyncConsumer):
       playerGroup = getPlayerGroup(gamename, session_key)
       async_to_sync(self.channel_layer.group_send)(
         playerGroup,
-        {'type': errorMessage,
+        {'type': 'errorMessage',
          'message': 'You haven\'t joined this game!'})
       return
 
@@ -77,6 +77,8 @@ class GameConsumer(SyncConsumer):
     game = model.getGame()
     if game.phase == event['phase']:
       try:
+        if len(game.usernames) < 2:
+          raise GameTerminated('Cannot start a game with less than 2 players. Game has been terminated.')
         game.allReadyUpdate();
         response = {}
         response['type'] = 'nextPhase'
@@ -87,11 +89,11 @@ class GameConsumer(SyncConsumer):
           response
         )
         model.saveGame(game)
-      except GameTerminated:
+      except GameTerminated as e:
         model.cleanupGame()
         response = {}
         response['type'] = 'update'
-        response['terminated'] = 'Game terminated due to no human-player troop assignments.'
+        response['terminated'] = str(e)
         response_group = getGameGroup(event['gamename'])
         async_to_sync(self.channel_layer.group_send)(
           response_group,
@@ -235,7 +237,7 @@ class PlayerConsumer(WebsocketConsumer):
       )
 
   def errorMessage(self, event):
-    self.send(json.dumps(event['message']))
+    self.send(json.dumps(event))
       
   def update(self, event):
     print('event')

@@ -11,13 +11,30 @@
         const DJANGO_STATIC_URL = '/static/';
     </script>
     <script src="{% static 'hexgame/pixi/pixi.min.js'%}"> </script>
+    <link rel="stylesheet" type="text/css" href="{% static 'hexgame/css/gamelist.css'%}">
 
   </head>
   <body>
+  <h1 id='tactics'> Tactics </h1>
+  <h2 id='subtitle'> An experimental war game </h1>
 
-  <h1> Game list: </h1>
+  <form id='quickplay' action="{% url 'hexgame:quickPlay' %}" method="post">
+  {% csrf_token %}
+    <input type="submit" value="Quick Play vs Computer">
+  </form>
 
-  <ul>
+  <h2> Game list </h2>
+
+  <ul id='gamelist'>
+
+  <li> 
+    <form action="{% url 'hexgame:createGame' %}" method="post">
+    {% csrf_token %}
+      Create game named:
+      <input required type="text" id="gamename" name="gamename">
+      <input type="submit" value="Create">
+    </form>
+
   {% for game in games %}
     <li> {{ game.0 }} 
 
@@ -30,61 +47,156 @@
     </li> 
   {% endfor %}
 
-  <li> 
-    <form action="{% url 'hexgame:createGame' %}" method="post">
-    {% csrf_token %}
-      Create game named:
-      <input required type="text" id="gamename" name="gamename">
-      <input type="submit" value="Create">
-    </form>
   </ul>
 
 
-  <h1> How to play: </h1>
+  <h2> How to play </h2>
 
-  THIS GUIDE IS UNFINISHED, needs images. I should probably just explain the game to everyone. 
+  <b> Tactics </b> is an experimental war game inspired by games like Risk and Diplomacy. In many free for all games, when one player is about to win, all other players have no choice but to team up on them to prevent the game from ending. While this can be fun, it moves the focus of the game away from a strategic challenge toward a more diplomatic one. This game is an attempt to make a free for all game where teaming up is impossible. The attempted "solution" is to only allow players to interact on a 1v1 basis. 
 
-  <h2> Overview: </h2>
-  This is an experimental war game inspired by games like risk and diplomacy. In many free for all games, when one player is about to win, all other players have no choice but to team up on them to prevent the game from ending. While this can be fun, it moves the focus of the game away from a strategic challenge toward a more diplomatic one. This game is an attempt to make a free for all game where teaming up is impossible. The attempted "solution" is to only allow players to interact on a 1v1 basis. 
+  <h3> The board </h3>
+  The gameboard consists of randomly generated hex tiles. The number of players (2-7) determines the board size. Each player starts with the same number of
+  tiles, which are assigned randomly. Tiles can be any of 4 terrain types, see "terrain" section below. The goal of the game is to control the most tiles
+  by the end of the last turn. Currently, games have no implemented end point - players should agree to play for some number of turns (10 is a good number).
 
-  <h2> Troops </h2>
-  At the beginning of each turn, each player recieves some number of troops that can be used to attack each other player. The number of troops player 1 can use
-to attack player 2 is equal to the number of borders players 1 and 2 share. Notice that this means that players interact on even footing, regardless of
-how many territories they control. In order to gain ground, you have to outplay your opponents on each turn. Theres is no "runaway" effect where a small lead
-snowballs into a big one. 
+  <figure> 
+  <img id='board' src="{% static 'hexgame/images/board.png'%}"> </img>
+  <figcaption> <b> Figure 1: </b> The board and interface for a game with three players. The
+  "..." next to each player's name on the left indicates the player has not
+  yet clicked "ready" (it will change into an R when the player is ready). 
+  The turn timer at the bottom left indicates the number of seconds until
+  the next turn. When all players click "ready" or the turn timer runs
+  out, the next phase will occurr. This image is from the green player's 
+  perspective - the "available troops" in the upper right indicate that 
+  player 1 has 9 troops they can use to interact with the blue player, 
+  and 5 with the red player. No troops have been assigned yet in this image.
+ </figcaption>
+  </figure> 
+
+
+  <h3> Troops </h3>
+  At the beginning of each turn, each player recieves some number of troops that can be used to attack and defend against each other player. 
+  The number of troops player 1 receives to interact with player 2 is equal to the number of borders players 1 and 2 share. 
+  Players do not have to use all their troops on each turn - if a player saves some of
+  them, they can be used on a following turn (this mechanic is necessary to prevent some 'stalemate' situations, where neither player would be able to gain 
+  ground if each had to play all their troops each turn). 
+  Notice that since the number of troops you receive to use against each player is equal to the number of 
+  borders you share with them, players interact on even footing, regardless of how many tiles they control.
+  In order to gain ground, you have to outplay your opponents on each turn. There is no "runaway" effect where a small lead
+  snowballs into a big one. 
 
 Troops are assigned to borders as either attacking troops or defending troops. Troops can only be assigned to a border with a specific player - for example,
-if players 1 and 2 share 5 borders, then each receives 5 troops to use to attack the other player (or defend against such attacks). These troops CANNOT be used
-to interact with any other players. 
+if players 1 and 2 share 5 borders, then each receives 5 troops to use to attack eachother (or defend against such attacks). These troops can only be assigned to
+borders between players 1 and 2, and can never interact with any other players.
+
+  <figure> 
+  <img id='attack1' src="{% static 'hexgame/images/attack1.png'%}"> </img>
+  <figcaption> <b> Figure 2: </b> An example troop assignment for a game
+  with three players. The resolution is in the next image. The colored circle
+  icons indicate troops assigned to a border (as either attack or defense).
+  The white shield icons indicate defending 
+  strength, and the black swords pointing across a border indicate 
+  attacking strength. 
+ </figcaption>
+  </figure>
+
+  <figure> 
+  <img id='attack2' src="{% static 'hexgame/images/attack2.png'%}"> </img>
+  <figcaption> <b> Figure 3: </b> The resolution of the above attacks. Refer
+  to the following sections for how attacks are resolved.
+  </figcaption>
+  </figure>
 
   <h3> Attack and defense </h3>
   A troop assigned to a border on "attack" by default supplies one attacking strength to that border. A troop assigned to a border on "defend" by default
   supplies TWO defending strength to that border, and ONE to each adjacent border, WITH THE SAME PLAYER. This bonus to adjacent borders does NOT apply if those
   borders would be defending against a different opponent. There are different territory types that modify these
-  values, they will be explained in the next section. After all troops have been assigned, attack strengths and defense strengths are compared to see if any
-  territories have been conquered. 
+  values; they will be explained in another section. 
 
-  <h3> Attack resolution </h3>
-  For each pair of conflicting borders, any attack values are compared. The greater attack value is the only attack that matters (you can think of the attacks
-  fighting and the bigger force winning, and then continuing on to the territory to fight the defending troops). If this attack force is greater than the 
-  sum of the opponent's defense strength and attack strength, then the territory is conquered. 
+  <h4> Phase progression </h4>
+  After all players have assigned troops and clicked "ready", phase 0 ends.
+  In phase 1, all troop assignments are visible to all players. In this phase,
+  no player can take any action - it only exists so that everyone can see 
+  what all the other players did, before attacks are resolved and tiles change
+  hands. Once all players click ready, attacks are resolved as follows, tiles
+  change ownership accordingly, and the next turn begins. 
+
+  <h4> Attack resolution </h4>
+  For each pair of conflicting borders, any attack values are compared. The greater attack value is the only attack that matters. 
+  If this attack force is greater than the sum of the opponent's defense strength and attack strength, then the territory is conquered. You can think of this 
+  as the attacks fighting, the larger force "winning", but losing some number of attack power equal to the opponent's attack power, and then the remaining
+  troops continuing on to fight the defending troops. If neither attack force is larger than the sum of the opponent's attack and defense strength, then
+  nothing happens.
+
   <h4> Ties with other players </h4>
     Notice that, if one territory shares borders with two opponents, then both opponents may be able to attack that territory at the same time. 
-    If both attacks are successfull, the player
-    with the greater total attacking force wins the territory. If two or more players conquer a territory
-    with the same attacking force strength, then the territory does not change hands at all! (the different attacking forces just fight eachother and everyone
-    dies, leaving the territory under the same ownership as it started).
+    If both attacks are successfull, the player with the greater total attacking force wins the territory. If two or more players conquer a territory
+    with the same attacking force strength, then the territory does not change hands at all! (You can think of this as the different attacking forces 
+    just fighting eachother. Everyone dies, leaving the territory under the same ownership as it started).
 
-  <h3> Territories </h3>
-  There are 4 types of territories in this game - Plains, Forests, Hills, and Mountains. Each has a unique effect on the gameplay.
+  <figure> 
+  <img id='tie1' src="{% static 'hexgame/images/tie1.png'%}"> </img>
+  <figcaption> <b> Figure 4: </b> An example of a tie. 
+  In the left blue forest, both red and green players would capture this
+  forest. But, they both would capture it with the same attack strength -
+  so there is a tie, and the tile remains blue. However, in the right forest,
+  again, both red and green would capture this tile. But this time, the red
+  player has attacked it with a strength of 5, while the green player has
+  only attacked with 4. So, the tile goes to the red player. Note that this
+  attack strength of 5 could come from different red tiles, and the red player
+  would still win the territory (although in this example, it all comes from
+  one tile).
+ </figcaption>
+  </figure> 
+
+  <figure> 
+  <img id='tie2' src="{% static 'hexgame/images/tie2.png'%}"> </img>
+  <figcaption> <b> Figure 5: </b> The tile ownership after the attacks
+  (and ties) in figure 2 have been resolved. The red player conquered
+  the right forest, while the left foreset did not change hands.
+ </figcaption>
+  </figure> 
+
+  <h3> Tile types </h3>
+  There are 4 types of tiles in this game - plains, hills, forests, and mountains. Each has a unique effect on the gameplay.
   <h4> Plains </h4>
-    When assigning attacking troops on a plains tile, the attack applies to adjacent borders as well (if those borders are with to the same opponent).
-  <h4> Forest </h4>
-    Forest tiles provide a constant +1 to defense to all borders on adjacent tiles. This bonus can only be applied once per border.
+    When assigning attacking troops on a plains tile, the attack applies to adjacent borders as well (if those borders are with the same opponent).
   <h4> Hills </h4>
     When troops are assigned to attack from a hills tile, they additionally provide defense to the adjacent borders (with the same opponent).
+  <h4> Forest </h4>
+    Forest tiles provide a constant +1 to defense to all borders on adjacent tiles owned by the same player. This bonus can only be applied once per border.
   <h4> Mountains </h4>
     All borders on a mountain receive +1 to defense. Mountains are the only tile that can start with a base +2 defense (if they are adjacent to a controlled
     forest).
+
+  <figure> 
+  <img id='plains' src="{% static 'hexgame/images/plains_attack.png'%}"> </img>
+  <figcaption> <b> Figure 6: </b> An example of an attack from a plains tile.
+  There are three troops assigned to attack the border with the left forest,
+  and these troops apply their attack force to both adjacent borders (
+  since both borders are with the same opponent).
+ </figcaption>
+  </figure> 
+
+  <figure> 
+  <img id='hills' src="{% static 'hexgame/images/hills.png'%}"> </img>
+  <figcaption> <b> Figure 7: </b> An example of an attack from a hills tile. 
+  There are three troops assigned to attack the mountain tile, and they
+  apply one defense strength each to adjacent borders with the same opponent -
+  in this case, only one border.
+ </figcaption>
+  </figure> 
+
+  <figure> 
+  <img id='mountain_forest' src="{% static 'hexgame/images/mountain_forest.png'%}"> </img>
+  <figcaption> <b> Figure 8: </b> An example of the defense bonuses applied
+  by forests and mountains. The blue mountain tile gets a base +1 defense, plus
+  another +1 from being near a forest tile. The red mountain tile is not
+  near a (red) forest tile, so it's base defense strength is just 1. Forest
+  tiles receive their own +1 bonus as well.
+ </figcaption>
+  </figure> 
+
+
   </body>
 </html>

@@ -12,6 +12,9 @@ from django.conf import settings
 def getGamepath():
   return os.path.join(settings.LOCAL_FILE_DIR, 'game_savefiles')
 
+class QuickplayCounter(models.Model):
+  val = models.IntegerField(default=0)
+
 class GameFile(models.Model):
   running = models.BooleanField(default=False)
   name = models.CharField(max_length=50, unique=True)
@@ -33,3 +36,21 @@ class GameFile(models.Model):
   def cleanupGame(self):
     os.remove(self.filepath())
     self.delete()
+  
+  # Makes a new gamefile model to service a quickplay request.
+  def makeNewQuickplay():
+    
+    qp_f = QuickplayCounter.objects.all()
+    if not qp_f:
+      qp = QuickplayCounter(0)
+    else: 
+      qp = qp_f[0]
+    gamename = 'Quickplay_' + str(qp.val)
+    while GameFile.objects.filter(name=gamename):
+      qp.val += 1;
+      gamename = 'Quickplay_' + str(ap.val)
+    qp.val += 1;
+    qp.save()
+    return GameFile(name=gamename)
+
+

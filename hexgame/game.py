@@ -45,10 +45,10 @@ class GameOb:
     self.bew = 0
     self.ainum = 0
     self.is_ai = []
-    # if a game isn't started in 1 minutes after it's created, it will be
+    # if a game isn't started in 30 minutes after it's created, it will be
     # started automatically
-    self.nextPhaseTime = datetime.now(timezone.utc) + timedelta(minutes=10)
-    self.turnTime = timedelta(minutes=0.2)
+    self.nextPhaseTime = datetime.now(timezone.utc) + timedelta(minutes=30)
+    self.turnTime = timedelta(minutes=5)
 
     # delay celery task by nextPhaseTime to advance phase
     nextPhaseTask.apply_async((self.name,self.phase), eta=self.nextPhaseTime)
@@ -69,6 +69,11 @@ class GameOb:
   def addPlayer(self, key, username):
     if self.territories:
       raise InvalidRequest('Game is already started, can\'t add any more players.')
+    if key in self.keys:
+      # player already in game, just update their username
+      p = self.getPlayer(key)
+      self.usernames[p] = username
+      return p
     self.usernames.append(username)
     self.is_ai.append(False)
     self.readies.append(False)
@@ -190,6 +195,7 @@ class GameOb:
           else:
             troop_type = random.choice([-1,1])
           self.setBorderValue(b, bv + troop_type)
+        self.available[player][opp] = 0
 
   def getBordersBetween(self, player, opp):
     for b in self.allBorders():
@@ -365,7 +371,6 @@ class GameOb:
 
 
   def resolveAttacks(self):
-
     human_troop_assigned = False
     updates = []
     for (i,j) in getTerritoryIndices(self.bew):
@@ -392,14 +397,13 @@ class GameOb:
         self.owners[i][j] = o
     for i in range(len(self.available)):
       for j in range(len(self.available[i])):
-        self.available[i][j] = self.maxTroops(i,j)
+        self.available[i][j] += self.maxTroops(i,j)
     # zero all borders
     self.borders = [[[[0 for _ in range(3)] for _ in range(3)] for _ in range(2*self.bew-1)] for _ in range(2*self.bew-1)]
     # if no human assigned any troops and no human was "ready" for the next
     # phase, terminate the game
     if (not human_troop_assigned) and self.is_ai == self.readies:
-      # went a turn without any human assigning any troops. Delete game
-      raise GameTerminated()
+      raise GameTerminated('Game terminated due to no human-player troop assignments')
       
     
 
