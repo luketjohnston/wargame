@@ -1,3 +1,30 @@
+To setup everything on ubuntu aws server:
+sudo apt install python3, pip3, python3-virtualenv
+virtualenv venv, source venv/bin/activate
+follow this guide to install redis: https://www.digitalocean.com/community/tutorials/how-to-install-and-secure-redis-on-ubuntu-18-04
+(sudo apt install redis-server, then setup redis as a service so it starts on login)
+
+sudo apt install postgresql
+sudo apt install libpq-dev (needed to get psycopg-2 install working)
+pip3 install -r requirements.txt
+
+# the below was used to get apache working with mod-wsgi, to run the wsgi.py.
+# instead I ended up using daphne.
+sudo apt install apache2 apache2-utils ssl-cert libapache2-mod-wsgi-py3
+sudo chmod 664 db.sqlite3
+sudo chown :www-data db.sqlite3
+sudo chown :www-data ~/wargame
+sudo chown :www-data gamefiles
+sudo service apache2 restart
+
+sudo a2enmod proxy_http # apache proxypass command, to route traffic to daphne
+
+
+django with mod-wsgi tut: https://docs.djangoproject.com/en/3.2/howto/deployment/wsgi/modwsgi/
+this one is also very useful (make sure to chown necessary stuff)
+https://www.digitalocean.com/community/tutorials/how-to-serve-django-applications-with-apache-and-mod_wsgi-on-ubuntu-14-04
+
+
 To get heroku working:
 need to makemigrations and migrate locally, then commit migration files with git
 heroku works by just pushing to the heroku app from git, you can learn it again pretty fast
