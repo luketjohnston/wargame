@@ -2,20 +2,21 @@
 
 
 This project is an experimental wargame inspired by the likes of Risk and Diplomacy.
-It is currently hosted on a free-tier AWS instance here, check it out!
-[Tactics](http://ec2-52-35-106-238.us-west-2.compute.amazonaws.com/hexgame/gamelist/)
+It is currently hosted on a free-tier AWS instance here, check it out here!
+
+[Tactics: http://ec2-52-35-106-238.us-west-2.compute.amazonaws.com/hexgame/gamelist/](http://ec2-52-35-106-238.us-west-2.compute.amazonaws.com/hexgame/gamelist/)
 
 # Implementation details
 
 Django-channels is used for websocket communication with players. A global "game manager"
 consumer (GameConsumer) processes all game updates. Game state is saved to disk by the game manager,
 and updated when a client submits an update. Filenames for these games are stored in the django database.
-Users do not log in with usernames/passowrd, the server just uses session storage to identify users
-(so you can't login to the same game as the same player from a different device or session). 
-Celery is used with a single worker that processes "turn timer up" events. Celery tasks scheduled
+Users do not log in with usernames/password, the server just uses session storage to identify users
+(so you can't login to the same game as the same player from a different web session). 
+Celery is used with a single worker to handle "turn timer up" events. Celery tasks are scheduled
 to advance the turn timer whenever a game phase progresses, and then the celery worker
-signals the game manager GameConsumer that the turn time is up for a specific game. These turn timers
-are used to clean up games that no longer have active human players.
+signals the game manager GameConsumer that the turn time is up for a specific game. 
+These turn timers are used to clean up games that no longer have active human players.
 
 On the client side, PIXI is used for implementation of the game interface. 
 
@@ -32,6 +33,8 @@ for the game info display)
 
 The AI is very simple - just randomly assigns all troops to borders, as either defenders
 or attackers. 
+
+Check input validation for all websocket messages, game name, usernames, etc. 
 
 Add user logins? I kind of like the session method, it's simple, reduces the overhead of starting a game...
 
